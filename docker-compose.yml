@@ -1,7 +1,9 @@
 version: '3.8'
 
 services:
-  backend:
+  gv_backend:
+    env_file:
+      - .env
     build: ./backend
     volumes:
       - ./backend:/app
@@ -9,11 +11,13 @@ services:
     ports:
       - "4000:4000"
     depends_on:
-      - db
+      - gv_db
     environment:
       - DATABASE_URL=postgres://postgres:postgres@db:5432/mydb
+      - CHOKIDAR_USEPOLLING=true
+      
 
-  frontend:
+  gv_frontend:
     build: ./frontend
     volumes:
       - ./frontend:/app
@@ -21,9 +25,11 @@ services:
     ports:
       - "5173:5173"
     depends_on:
-      - backend
+      - gv_backend
+    environment:
+      - CHOKIDAR_USEPOLLING=true
 
-  db:
+  gv_db:
     image: postgres:16
     restart: always
     ports:
@@ -32,6 +38,8 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
