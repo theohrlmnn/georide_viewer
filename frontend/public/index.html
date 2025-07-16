@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Carte GeoRide</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        html,
+        body,
+        #map {
+            height: 100%;
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const trajets = [
+            { trackerId: 2055973, tripId: 10339048 },
+            // Ajoute ici d'autres trajets si tu veux tester
+            { trackerId: 2055973, tripId: 10332286 },
+            { trackerId: 2055973, tripId: 10420045 },
+
+        ];
+
+        const map = L.map('map');
+
+        // ✅ Fond de carte OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        const bounds = [];
+
+        trajets.forEach(({ trackerId, tripId }) => {
+            fetch(`http://localhost:4000/geojson/${trackerId}/${tripId}`)
+                .then(res => res.json())
+                .then(geojson => {
+                    const color = getRandomColor();
+
+                    // 🟦 Polyline du trajet
+                    const feature = L.geoJSON(geojson, {
+                        style: {
+                            color,
+                            weight: 4
+                        }
+                    }).addTo(map);
+
+                    // 📍 Départ
+                    const startCoord = geojson.geometry.coordinates[0];
+                    L.marker([startCoord[1], startCoord[0]], {
+                        icon: L.icon({
+                            iconUrl: 'https://cdn.shopify.com/s/files/1/0666/0580/9932/files/pin-vert.png',
+                            iconSize: [24, 32],
+                            iconAnchor: [12, 32]
+                        })
+                    }).addTo(map).bindPopup('Départ');
+
+                    // 🟥 Arrivée
+                    const endCoord = geojson.geometry.coordinates[geojson.geometry.coordinates.length - 1];
+                    L.marker([endCoord[1], endCoord[0]], {
+                        icon: L.icon({
+                            iconUrl: 'https://cdn.shopify.com/s/files/1/0666/0580/9932/files/pin-rouge.png',
+                            iconSize: [24, 32],
+                            iconAnchor: [12, 32]
+                        })
+                    }).addTo(map).bindPopup('Arrivée');
+
+                    bounds.push(feature.getBounds());
+
+                    // 🧭 Ajuster la vue après tous les chargements
+                    if (bounds.length === trajets.length) {
+                        const allBounds = bounds.reduce((acc, b) => acc.extend(b), bounds[0]);
+                        map.fitBounds(allBounds);
+                    }
+                })
+                .catch(err => console.error('Erreur lors du chargement GeoJSON', err));
+        });
+
+        // 🎨 Couleur aléatoire
+        function getRandomColor() {
+            const hue = Math.floor(Math.random() * 360);
+            return `hsl(${hue}, 70%, 50%)`;
+        }
+    </script>
+</body>
+
+</html>

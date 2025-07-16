@@ -1,5 +1,5 @@
 // src/services/tripImporter.ts
-import { getTrips, getTripPositions } from './georide';
+import { getTrips, getTripPositions } from './georideClient';
 import pool from '../db';
 import logger from '../utils/logger';
 import { log } from 'console';
