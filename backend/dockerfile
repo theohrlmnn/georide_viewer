@@ -1,13 +1,18 @@
 # backend/Dockerfile
 FROM node:23-alpine
 
+# Dossier de travail
 WORKDIR /app
 
+# Copie les fichiers de dépendances
 COPY package*.json ./
-RUN npm install
 
+# Installe TOUTES les dépendances (y compris dev)
+RUN npm install --include=dev
+
+# Copie le code après les dépendances
 COPY . .
 
-#RUN npm run build
-
+# Commande de démarrage
 CMD ["npm", "run", "start:dev"]
+
