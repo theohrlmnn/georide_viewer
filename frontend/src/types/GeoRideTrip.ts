@@ -1,4 +1,4 @@
-export interface Trip {
+export interface GeoRideTrip {
   id: number;
   trackerId: number;
   startTime: string;
@@ -18,20 +18,7 @@ export interface Trip {
   maxLeftAngle: number;
   maxRightAngle: number;
   averageAngle: number;
+  imported?: boolean
+  selected?: boolean
   raw?: any;
-}
-
-export interface Position {
-  fix_time: string;
-  latitude: number;
-  longitude: number;
-  speed: number;
-  address: string;
-  angle: number;
-}
-
-export interface GeoJSONFeature {
-  type: 'Feature'
-  properties: Record<string, any>
-  geometry: { type: 'LineString'; coordinates: [number, number][] }
 }

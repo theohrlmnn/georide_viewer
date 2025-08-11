@@ -131,3 +131,7 @@ dist
 
 .DS_Store
 .vscode/settings.json
+
+BRUNO/
+listing.txt
+make-bundle.sh

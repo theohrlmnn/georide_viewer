@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 #root {
   max-width: 1280px;
   margin: 0 auto;
@@ -39,4 +41,11 @@
 
 .read-the-docs {
   color: #888;
+}
+
+/* Ne pas laisser le reset Tailwind toucher les tuiles Leaflet */
+.leaflet-container img,
+.leaflet-container .leaflet-tile,
+.leaflet-container canvas {
+  max-width: none !important;
 }

@@ -1,35 +1,69 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+// src/App.tsx
+import React, { useEffect } from 'react'
+import MapView from './components/MapView'
+import MenuSwitch from './components/MenuSwitch'
+import TripListPanel from './components/TripListPanel'
+import { useGeoRideStore } from './store/georideStore'
 
-function App() {
-  const [count, setCount] = useState(0)
+const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'
+const TRACKER_ID = 2055973
+const toIso = (v?: string) => (v ? new Date(v).toISOString() : undefined)
+const toInputValue = (iso?: string) => (iso ? new Date(iso).toISOString().slice(0,16) : '')
 
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+export default function App() {
+  // ✅ Sélecteurs stables
+  const viewMode     = useGeoRideStore(s => s.viewMode)
+  const dateFrom     = useGeoRideStore(s => s.dateFrom)
+  const dateTo       = useGeoRideStore(s => s.dateTo)
+  const setDateRange = useGeoRideStore(s => s.setDateRange)
+  const fetchTrips   = useGeoRideStore(s => s.fetchTrips)
+
+  // ✅ Recharge auto quand viewMode/dateFrom/dateTo changent
+  useEffect(() => {
+    console.debug('[App] reload trips', { viewMode, dateFrom, dateTo })
+    fetchTrips(BASE)
+  }, [viewMode, dateFrom, dateTo, fetchTrips])
+
+ return (
+  <div className="h-screen w-screen relative">
+    <div className="absolute inset-0">
+      <MapView baseUrl={BASE} trackerId={TRACKER_ID} />
+    </div>
+
+    <div className="absolute bottom-4 left-4 z-[1000] flex flex-col gap-4">
+      {/* Switch toujours en haut */}
+      <div className="bg-gray-900/70 text-white rounded-xl shadow-lg p-3 backdrop-blur-md">
+        <MenuSwitch />
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMRRRRRRR
-        </p>
+
+      {/* Filtres date — toujours affichés (local & georide) */}
+      <div className="bg-gray-900/70 text-white rounded-xl shadow-lg p-3 backdrop-blur-md flex items-end gap-3">
+        <div className="flex flex-col">
+          <label className="text-xs font-medium mb-1">Date début</label>
+          <input
+            type="datetime-local"
+            className="border border-gray-700 rounded px-2 py-1 text-sm bg-gray-800 text-white"
+            value={toInputValue(dateFrom)}
+            onChange={(e) => setDateRange(toIso(e.target.value), dateTo)}
+          />
+        </div>
+        <div className="flex flex-col">
+          <label className="text-xs font-medium mb-1">Date fin</label>
+          <input
+            type="datetime-local"
+            className="border border-gray-700 rounded px-2 py-1 text-sm bg-gray-800 text-white"
+            value={toInputValue(dateTo)}
+            onChange={(e) => setDateRange(dateFrom, toIso(e.target.value))}
+          />
+        </div>
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+
+      {/* Liste toujours en dessous */}
+      <div className="bg-gray-900/70 text-white rounded-xl shadow-lg p-3 backdrop-blur-md">
+        <TripListPanel />
+      </div>
+    </div>
+  </div>
+)
+
 }
-
-export default App

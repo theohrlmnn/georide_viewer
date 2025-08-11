@@ -41,30 +41,7 @@ export async function insertTripPositions(tripId: number, positions: Position[])
     client.release();
   }
 }
-export async function getTripGeoJSON(tripId: number): Promise<any> {
-  const res = await pool.query(
-    `
-    SELECT latitude, longitude
-    FROM trip_positions
-    WHERE trip_id = $1
-    ORDER BY fix_time ASC
-    `,
-    [tripId]
-  );
 
-  const coordinates = res.rows.map((pos) => [pos.longitude, pos.latitude]);
-
-  return {
-    type: 'Feature',
-    geometry: {
-      type: 'LineString',
-      coordinates
-    },
-    properties: {
-      tripId
-    }
-  };
-}
 export async function getPositionsByTripId(tripId: number): Promise<any[]> {
   const res = await pool.query(
     `

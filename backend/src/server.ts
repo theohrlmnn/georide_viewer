@@ -5,8 +5,13 @@ import dotenv from 'dotenv';
 import { initDb } from './db/initDb';
 import { importTrips } from './services/tripImporter';
 import { getAllTrips, getTripById, deleteTripById } from './repositories/tripRepository';
-import { getTripGeoJSON, getPositionsByTripId } from './repositories/tripPositionsRepository';
+import { getPositionsByTripId } from './repositories/tripPositionsRepository';
+import { getTrips } from './services/georideClient';
 
+import { GeorideProvider } from './providers/georideProvider'
+import { LocalProvider } from './providers/localProvider'
+import { listTrips, getTripGeoJSON } from './services/tripService'
+import helmet from 'helmet'
 dotenv.config();
 
 
@@ -14,8 +19,40 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 4000;
 
-app.use(cors());
-app.use(express.json()); // parse JSON body
+app.use(helmet())
+app.use(cors({ origin: 'http://localhost:5173' }))
+app.use(express.json())
+
+// GET /trips/georide?trackerId=2055973&from=ISO&to=ISO
+app.get('/georide/trips', async (req: Request, res: Response) => {
+  try {
+    const trackerId = req.query.trackerId ? Number(req.query.trackerId) : undefined
+    const from = typeof req.query.from === 'string' ? req.query.from : undefined
+    const to   = typeof req.query.to   === 'string' ? req.query.to   : undefined
+    if (!trackerId) return res.status(400).json({ error: 'trackerId requis' })
+    const trips = await listTrips(new GeorideProvider(), { trackerId, from, to })
+    res.json(trips)
+  } catch (e:any) {
+    res.status(400).json({ error: e.message })
+  }
+})
+
+// GET /trips/georide/:tripId/geojson?trackerId=...&from=...&to=...
+app.get('/georide/trips/:id/geojson', async (req: Request, res: Response) => {
+  const id = Number(req.params.id)
+  const trackerId = Number(req.query.trackerId)
+  const from = req.query.from as string | undefined
+  const to   = req.query.to as string | undefined
+  if (!id || !trackerId || !from || !to) {
+    return res.status(400).json({ error: 'id, trackerId, from, to requis' })
+  }
+  try {
+    const feature = await getTripGeoJSON(new GeorideProvider(), { id, trackerId, from, to })
+    res.json(feature)
+  } catch (e:any) {
+    res.status(500).json({ error: e.message })
+  }
+})
 
 // POST /trips/import
 app.post('/trips/import', async (req: Request, res: Response) => {
@@ -32,11 +69,14 @@ app.post('/trips/import', async (req: Request, res: Response) => {
   }
 });
 
-// GET /trips
 app.get('/trips', async (req: Request, res: Response) => {
-  const trips = await getAllTrips();
-  res.json(trips);
-});
+  try {
+    const trips = await listTrips(new LocalProvider(), {})
+    res.json(trips)
+  } catch (e:any) {
+    res.status(500).json({ error: e.message })
+  }
+})
 
 // GET /trips/:id
 app.get('/trips/:id', async (req: Request, res: Response) => {
@@ -49,26 +89,21 @@ app.get('/trips/:id', async (req: Request, res: Response) => {
   res.json(trip);
 });
 
-app.get('/trips/:id/geojson', async (req, res) => {
-  const tripId = parseInt(req.params.id);
-  if (isNaN(tripId)) {
-    return res.status(400).json({ error: 'ID invalide' });
-  }
-
+app.get('/trips/:id/geojson', async (req: Request, res: Response) => {
+  const id = Number(req.params.id)
+  if (Number.isNaN(id)) return res.status(400).json({ error: 'ID invalide' })
   try {
-    const geojson = await getTripGeoJSON(tripId);
-    if (!geojson.geometry.coordinates.length) {
-      return res.status(404).json({ error: 'Aucune position trouvée pour ce trajet' });
+    const feature = await getTripGeoJSON(new LocalProvider(), { id })
+    if (!feature.geometry.coordinates.length) {
+      return res.status(404).json({ error: 'Aucune position trouvée pour ce trajet' })
     }
-
-    res.json(geojson);
-  } catch (err) {
-    console.error('Erreur /trips/:id/geojson :', err);
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.json(feature)
+  } catch (e:any) {
+    res.status(500).json({ error: e.message })
   }
-});
+})
 
-app.get('/trips/:id/positions', async (req, res) => {
+app.get('/trips/:id/positions', async (req: Request, res: Response) => {
   const tripId = parseInt(req.params.id);
   if (isNaN(tripId)) {
     return res.status(400).json({ error: 'ID invalide' });
@@ -87,7 +122,7 @@ app.get('/trips/:id/positions', async (req, res) => {
   }
 });
 
-app.delete('/trips/:id', async (req, res) => {
+app.delete('/trips/:id', async (req: Request, res: Response) => {
   const tripId = parseInt(req.params.id);
   if (isNaN(tripId)) {
     return res.status(400).json({ error: 'ID invalide' });
