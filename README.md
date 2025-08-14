@@ -89,25 +89,6 @@ L'objectif est double :
 └── docker-compose.yml
 ```
 
----
-
-## 👤 Auteur
-
-**Théo Hurlimann**  
-- 🎓 Diplômé en informatique de gestion (HEG Genève, 2024)  
-- 💼 Expérience en développement backend/frontend, intégration API, DevOps  
-- 🔗 [LinkedIn](https://www.linkedin.com/) *(à remplacer)*  
-- 📧 Email : *(à remplacer)*
-
----
-
-## 💡 Pour les recruteurs
-
-Ce projet illustre :
-- La **capacité à concevoir** une architecture claire et modulaire
-- La **maîtrise du full‑stack** (frontend, backend, BDD, Docker)
-- L’attention portée à la **performance** et à la **qualité du code**
-- L’**expérience API REST** et intégration de services tiers
-- La **gestion d’état** avancée côté frontend
-
 Il est conçu pour évoluer vers une **application complète de gestion et visualisation GPS**.
+
+
