@@ -12,11 +12,11 @@ export async function tripExists(tripId: number): Promise<boolean> {
 export async function insertTrip(trip: Trip): Promise<void> {
   await pool.query(
     `INSERT INTO trips (
-      trip_id, tracker_id, start_time, end_time,
-      start_lat, start_lon, end_lat, end_lon,
-      distance, average_speed, max_speed, duration,
-      start_address, end_address, static_image,
-      max_angle, max_left_angle, max_right_angle, average_angle, raw
+      trip_id, trackerId, startTime, endTime,
+      startLat, startLon, endLat, endLon,
+      distance, averageSpeed, maxSpeed, duration,
+      startAddress, endAddress, staticImage,
+      maxAngle, maxLeftAngle, maxRightAngle, averageAngle, raw
     ) VALUES (
       $1, $2, $3, $4,
       $5, $6, $7, $8,
@@ -49,31 +49,58 @@ export async function insertTrip(trip: Trip): Promise<void> {
   );
 }
 
-export async function getAllTrips(): Promise<Trip[]> {
-  const res = await pool.query(`
+export async function getAllTrips(from?: string, to?: string): Promise<Trip[]> {
+  let query = `
     SELECT
       trip_id AS id,
-      tracker_id,
-      start_time,
-      end_time,
-      start_lat,
-      start_lon,
-      end_lat,
-      end_lon,
+      trackerId,
+      startTime,
+      endTime,
+      startLat,
+      startLon,
+      endLat,
+      endLon,
       distance,
-      average_speed,
-      max_speed,
+      averageSpeed,
+      maxSpeed,
       duration,
-      start_address,
-      end_address,
-      static_image,
-      max_angle,
-      max_left_angle,
-      max_right_angle,
-      average_angle
+      startAddress,
+      endAddress,
+      staticImage,
+      maxAngle,
+      maxLeftAngle,
+      maxRightAngle,
+      averageAngle
     FROM trips
-    ORDER BY start_time DESC;
-  `);
+  `;
+  
+  const params: any[] = [];
+  let paramIndex = 1;
+  
+  if (from || to) {
+    query += ' WHERE ';
+    const conditions: string[] = [];
+    
+    if (from) {
+      conditions.push(`startTime >= $${paramIndex}`);
+      params.push(from);
+      paramIndex++;
+    }
+    
+    if (to) {
+      conditions.push(`endTime <= $${paramIndex}`);
+      params.push(to);
+      paramIndex++;
+    }
+    
+    query += conditions.join(' AND ');
+  }
+  
+  query += ' ORDER BY startTime DESC';
+  
+  const res = await pool.query(query, params);
+  
+  // Plus besoin de conversion, la DB est déjà en camelCase
   return res.rows;
 }
 
@@ -81,29 +108,31 @@ export async function getTripById(tripId: number): Promise<Trip | null> {
   const res = await pool.query(`
     SELECT
       trip_id AS id,
-      tracker_id,
-      start_time,
-      end_time,
-      start_lat,
-      start_lon,
-      end_lat,
-      end_lon,
+      trackerId,
+      startTime,
+      endTime,
+      startLat,
+      startLon,
+      endLat,
+      endLon,
       distance,
-      average_speed,
-      max_speed,
+      averageSpeed,
+      maxSpeed,
       duration,
-      start_address,
-      end_address,
-      static_image,
-      max_angle,
-      max_left_angle,
-      max_right_angle,
-      average_angle
+      startAddress,
+      endAddress,
+      staticImage,
+      maxAngle,
+      maxLeftAngle,
+      maxRightAngle,
+      averageAngle
     FROM trips
     WHERE trip_id = $1;
   `, [tripId]);
 
   if (res.rowCount === 0) return null;
+  
+  // Plus besoin de conversion, la DB est déjà en camelCase
   return res.rows[0];
 }
 

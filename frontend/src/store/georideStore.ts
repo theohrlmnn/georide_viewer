@@ -1,88 +1,153 @@
 // src/store/georideStore.ts
 import { create } from 'zustand'
 
-type ViewMode = 'georide' | 'local'
-const isoNow = () => new Date().toISOString()
-const isoMinus = (h: number) => new Date(Date.now() - h * 3600_000).toISOString()
+export type ViewMode = 'georide' | 'local'
 
-interface GeoRideStore {
+export type Trip = {
+  id?: number | null
+  trackerId?: number | null
+  startTime?: string | null
+  endTime?: string | null
+  distance?: number | null
+  duration?: number | null
+  averageSpeed?: number | null
+  selected?: boolean
+}
+
+type GeojsonCache = Record<string, any>
+
+type State = {
   viewMode: ViewMode
   dateFrom?: string
   dateTo?: string
-
-  setViewMode: (m: ViewMode) => void
-  setDateRange: (from?: string, to?: string) => void
-
-  trips: any[]
-  setTrips: (t: any[]) => void
-  toggleTrip: (id: number) => void
-
-  geojsonCache: Record<number, any>
-  setGeojsonFor: (id: number, data: any) => void
-
+  trackerId?: number
+  trips: Trip[]
+  geojsonCache: GeojsonCache
   loading: boolean
   error?: string
-
-  fetchTrips: (baseUrl: string) => Promise<void>
 }
 
-export const useGeoRideStore = create<GeoRideStore>((set, get) => ({
-  viewMode: 'georide',
-  dateFrom: isoMinus(24),
-  dateTo: isoNow(),
+type Actions = {
+  setViewMode: (m: ViewMode) => void
+  setDateRange: (from?: string, to?: string) => void
+  resetDateRange: () => void
+  setTrackerId: (id?: number) => void
 
-  setViewMode: (m) => set({ viewMode: m }),
-  setDateRange: (from, to) => set({ dateFrom: from, dateTo: to }),
+  resetGeojson: () => void
+  clearTrips: () => void
+  setGeojsonFor: (key: string, data: any) => void
 
-  trips: [],
-  setTrips: (t) => set({ trips: t }),
-  toggleTrip: (id) =>
-    set((s) => ({ trips: s.trips.map(x => x.id === id ? { ...x, selected: !x.selected } : x) })),
+  toggleTrip: (trip: Trip) => void
+  fetchTrips: (baseUrl: string, trackerId?: number) => Promise<void>
+}
 
-  geojsonCache: {},
-  setGeojsonFor: (id, data) => set((s) => ({ geojsonCache: { ...s.geojsonCache, [id]: data } })),
+// ---------- helpers partagés ----------
 
-  loading: false,
-  error: undefined,
+// Fonction pour calculer les dates par défaut (dernières 24 heures)
+const getDefaultDateRange = () => {
+  const now = new Date()
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  return {
+    from: yesterday.toISOString(),
+    to: now.toISOString()
+  }
+}
 
-  fetchTrips: async (baseUrl: string) => {
-    const { viewMode, dateFrom, dateTo, setTrips } = get()
-    const url = new URL(
-      viewMode === 'georide' ? `${baseUrl}/georide/trips` : `${baseUrl}/trips`
-    )
-    
-    if (viewMode === 'georide') {
-      const trackerId = 2055973 // TODO: rendre dynamique
-      if (!trackerId) throw new Error('trackerId requis')
-      if (!dateFrom || !dateTo) throw new Error('from/to requis en mode georide')
-      url.searchParams.set('trackerId', String(trackerId))
-      url.searchParams.set('from', dateFrom)
-      url.searchParams.set('to', dateTo)
-    }
+export const normalizeKey = (t: Trip) =>
+  t.id != null ? `id:${t.id}` : `trk:${t.trackerId}|${t.startTime}|${t.endTime}`
 
-    set({ loading: true, error: undefined })
-    try {
-      const res = await fetch(url.toString())
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      if (!Array.isArray(data)) throw new Error('Réponse inattendue')
-      const norm = data.map((t: any) => ({
-        id: t.id,
-        tracker_id: t.tracker_id ?? t.trackerId ?? null,
-        start_time: t.start_time ?? t.startTime,
-        end_time: t.end_time ?? t.endTime,
-        distance: t.distance ?? 0,
-        average_speed: t.average_speed ?? t.averageSpeed ?? 0,
-        duration: t.duration ?? 0,
-        start_address: t.start_address ?? t.startAddress ?? null,
-        end_address: t.end_address ?? t.endAddress ?? null,
-        selected: false,
-      }))
-      setTrips(norm)
-    } catch (e: any) {
-      set({ error: e?.message ?? 'Erreur de chargement' })
-    } finally {
-      set({ loading: false })
-    }
-  },
-}))
+export const cacheKey = (mode: ViewMode, t: Trip) => `${mode}:${normalizeKey(t)}`
+
+// (même algo des deux côtés pour garantir une couleur stable coordonnée avec la légende)
+export const colorOf = (t: Trip) => {
+  const k = normalizeKey(t)
+  let h = 0
+  for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) | 0
+  const palette = [
+    '#e6194b', '#3cb44b', '#ffe119', '#0082c8', '#f58231',
+    '#911eb4', '#46f0f0', '#f032e6', '#d2f53c', '#fabebe',
+    '#008080', '#e6beff', '#aa6e28', '#800000', '#808000'
+  ]
+  return palette[Math.abs(h) % palette.length]
+}
+export const hasBounds = (t: Trip) => !!(t.startTime && t.endTime)
+
+const strip = (u: string) => u.replace(/\/+$/, '')
+
+const buildTripsUrl = (
+  baseUrl: string,
+  mode: ViewMode,
+  from?: string,
+  to?: string,
+  trackerId?: number
+) => {
+  const base = strip(baseUrl)
+  if (mode === 'georide') {
+    const p = new URLSearchParams()
+    if (trackerId != null) p.set('trackerId', String(trackerId))
+    if (from) p.set('from', from)
+    if (to) p.set('to', to)
+    return `${base}/georide/trips?${p.toString()}`
+  }
+  const p = new URLSearchParams()
+  if (from) p.set('from', from)
+  if (to) p.set('to', to)
+  const qs = p.toString()
+  return qs ? `${base}/trips?${qs}` : `${base}/trips`
+}
+
+// ---------- store ----------
+export const useGeoRideStore = create<State & Actions>((set, get) => {
+  const defaultDates = getDefaultDateRange()
+  
+  return {
+    viewMode: 'georide',
+    dateFrom: defaultDates.from,
+    dateTo: defaultDates.to,
+    trips: [],
+    geojsonCache: {},
+    loading: false,
+
+    setViewMode: (m) => set({ viewMode: m }),
+    setDateRange: (from, to) => set({ dateFrom: from, dateTo: to }),
+    resetDateRange: () => set({ dateFrom: defaultDates.from, dateTo: defaultDates.to }),
+    setTrackerId: (id) => set({ trackerId: id }),
+
+    resetGeojson: () => set({ geojsonCache: {} }),
+    clearTrips: () => set({ trips: [] }),
+
+    setGeojsonFor: (key, data) => set(s => ({
+      geojsonCache: { ...s.geojsonCache, [key]: data }
+    })),
+
+    toggleTrip: (trip) => set(s => ({
+      trips: s.trips.map(t =>
+        normalizeKey(t) === normalizeKey(trip) ? { ...t, selected: !t.selected } : t
+      )
+    })),
+
+    fetchTrips: async (baseUrl: string, trackerId?: number) => {
+      const { viewMode, dateFrom, dateTo, trips } = get()
+      set({ loading: true, error: undefined })
+      try {
+        const prevMap = new Map(trips.map(t => [normalizeKey(t), !!t.selected]))
+        const url = buildTripsUrl(baseUrl, viewMode, dateFrom, dateTo, trackerId ?? get().trackerId)
+        const res = await fetch(url)
+        if (!res.ok) throw new Error(`HTTP ${res.status} on ${url}`)
+        const incoming: Trip[] = await res.json()
+
+        // Préserver selected au refresh
+        const merged = incoming.map(t => ({
+          ...t,
+          selected: prevMap.get(normalizeKey(t)) ?? false
+        }))
+
+        set({ trips: merged })
+      } catch (e: any) {
+        set({ error: String(e?.message ?? e) })
+      } finally {
+        set({ loading: false })
+      }
+    },
+  }
+})

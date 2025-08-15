@@ -14,7 +14,7 @@ export async function getTripGeoJSON(provider: TripProvider, args: GeojsonArgs):
     properties: {
       trip_id: args.id,
       source: provider.constructor.name.replace('Provider', '').toLowerCase(), // "georide" | "local"
-      tracker_id: args.trackerId ?? null,
+      trackerId: args.trackerId ?? null,
       from: args.from ?? null,
       to: args.to ?? null,
       points: coordinates.length,

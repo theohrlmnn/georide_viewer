@@ -1,31 +1,63 @@
-import React from 'react'
-import { useGeoRideStore } from '../store/georideStore'
+import React, { useEffect } from 'react'
+import { useGeoRideStore, colorOf, normalizeKey } from '../store/georideStore'
+import type { Trip } from '../store/georideStore'
 import TripTimeRange from './TripTimeRange'
-export default function TripListPanel() {
-  const trips = useGeoRideStore(s => s.trips)
-  const setTrips = useGeoRideStore(s => s.setTrips)
+import { API_BASE_URL } from '../config'
 
-  const toggle = (id: number) => {
-    setTrips(trips.map(t => t.id === id ? { ...t, selected: !t.selected } : t))
-  }
+const keyOf = (t: Trip, idx: number) =>
+  t.id != null ? `t-${t.id}` : `t-${t.trackerId}-${t.startTime}-${t.endTime}-${idx}`
+
+export default function TripListPanel() {
+  const viewMode    = useGeoRideStore(s => s.viewMode)
+  const dateFrom    = useGeoRideStore(s => s.dateFrom)
+  const dateTo      = useGeoRideStore(s => s.dateTo)
+  const trackerId   = useGeoRideStore(s => s.trackerId)
+  const fetchTrips  = useGeoRideStore(s => s.fetchTrips)
+  const resetDateRange = useGeoRideStore(s => s.resetDateRange)
+
+  useEffect(() => {
+    if (viewMode === 'georide' && !trackerId) return
+    fetchTrips(API_BASE_URL, trackerId)
+  }, [viewMode, dateFrom, dateTo, trackerId, fetchTrips])
+
+  const trips = useGeoRideStore(s => s.trips)
+  const toggleTrip = useGeoRideStore(s => s.toggleTrip)
 
   return (
     <div className="bg-white/80 rounded-2xl shadow-xl p-4 max-h-[40vh] overflow-y-auto w-80">
-      <h2 className="text-lg font-bold mb-2">Trajets</h2>
       {trips.length === 0 && <p className="text-sm text-gray-500">Aucun trajet</p>}
       <ul className="space-y-2">
-        {trips.map((t) => (
-          <li key={t.id}
-            className={`border rounded-lg p-2 cursor-pointer ${t.selected ? 'bg-blue-100 border-blue-400' : 'bg-white'}`}
-            onClick={() => toggle(t.id)}>
-            <div className="text-sm font-medium">
-              <TripTimeRange start={t.start_time} end={t.end_time} />
-            </div>
-            <div className="text-xs text-gray-600">
-              {Math.round(t.distance / 100) / 10} km · {Math.round(t.duration / 60)} min · {Math.round(t.average_speed)} km/h
-            </div>
-          </li>
-        ))}
+        {trips.map((t, idx) => {
+          const km   = (t.distance ?? 0) / 1000
+          const mins = Math.round((t.duration ?? 0) / 60)
+          const avg  = Math.round(t.averageSpeed ?? 0)
+          
+          return (
+            <li
+              key={keyOf(t, idx)}
+              className={`border rounded-lg p-2 cursor-pointer flex items-center gap-2 ${t.selected ? 'bg-blue-100 border-blue-400' : 'bg-white'}`}
+              onClick={() => toggleTrip(t)}
+              title={normalizeKey(t)}
+            >
+              <span className="inline-block h-3 w-3 rounded-full" style={{ background: colorOf(t) }} />
+              <div className="flex-1">
+                <div className="text-sm font-medium">
+                  <TripTimeRange start={t.startTime} end={t.endTime} />
+                </div>
+                <div className="text-xs text-gray-600">
+                  {km.toFixed(1)} km · {mins} min · {avg} km/h
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                onChange={() => toggleTrip(t)}
+                checked={!!t.selected}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

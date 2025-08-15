@@ -18,29 +18,8 @@ export class GeorideProvider implements TripProvider {
     if (!res.ok) throw new Error(`GeoRide error: ${res.status}`)
     const raw = await res.json()
 
-    // normalisation -> snake_case utilisé côté front
-    return raw.map((t: any): Trip => ({
-      id: t.id,
-      trackerId,
-      startTime: t.start_time,
-      endTime: t.end_time,
-      distance: t.distance,
-      averageSpeed: t.average_speed,
-      maxSpeed: t.max_speed,
-      duration: t.duration,
-      startLat: t.start_lat,
-      startLon: t.start_lon,
-      endLat: t.end_lat,
-      endLon: t.end_lon,
-      startAddress: t.start_address,
-      endAddress: t.end_address,
-      staticImage: t.static_image,
-      maxAngle: t.max_angle,
-      maxLeftAngle: t.max_left_angle,
-      maxRightAngle: t.max_right_angle,
-      averageAngle: t.average_angle,
-      raw: t
-    }))
+
+    return raw
   }
 
   async getPositions({ trackerId, from, to }: GeojsonArgs): Promise<Position[]> {

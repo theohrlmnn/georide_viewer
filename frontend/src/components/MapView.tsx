@@ -2,61 +2,50 @@
 import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useEffect } from 'react'
-import { useGeoRideStore } from '../store/georideStore'
+import { useGeoRideStore, cacheKey, colorOf } from '../store/georideStore'
+import { resolveBounds } from './TripTimeRange'
 
 type Props = { baseUrl: string; trackerId: number }
+const strip = (u: string) => u.replace(/\/+$/, '')
 
 export default function MapView({ baseUrl, trackerId }: Props) {
-  const viewMode = useGeoRideStore(s => s.viewMode)
-  const dateFrom = useGeoRideStore(s => s.dateFrom)
-  const dateTo = useGeoRideStore(s => s.dateTo)
-  const trips = useGeoRideStore(s => s.trips)
-  const geojsonCache = useGeoRideStore(s => s.geojsonCache)
+  const viewMode      = useGeoRideStore(s => s.viewMode)
+  const trips         = useGeoRideStore(s => s.trips)
+  const geojsonCache  = useGeoRideStore(s => s.geojsonCache)
   const setGeojsonFor = useGeoRideStore(s => s.setGeojsonFor)
 
   useEffect(() => {
-    // ne charger que les trajets sélectionnés sans GeoJSON en cache
-    const toLoad = trips.filter(t => t.selected && !geojsonCache[t.id])
+    const base = strip(baseUrl)
+    const toLoad = trips.filter(t => t.selected && !geojsonCache[cacheKey(viewMode, t)])
     if (toLoad.length === 0) return
 
-    // en mode georide, il faut from/to
-    if (viewMode === 'georide' && (!dateFrom || !dateTo)) {
-      console.warn('[MapView] viewMode=georide mais from/to manquants → pas de fetch')
-      return
-    }
-
-    ; (async () => {
+    ;(async () => {
       for (const t of toLoad) {
         try {
-
-          // sécurité: on saute si les bornes du trip manquent
-          if (viewMode === 'georide' && (!t.start_time || !t.end_time)) {
-            console.warn('[MapView] trip sans bornes start/end:', t.id)
-            continue
+          let url: string
+          if (viewMode === 'georide') {
+            // Utilise toujours des bornes valides (fallback 24h si manquant)
+            const { startIso, endIso } = resolveBounds(t.startTime, t.endTime, 24)
+            url = `${base}/georide/trips/${t.id}/geojson?trackerId=${trackerId}&from=${encodeURIComponent(startIso)}&to=${encodeURIComponent(endIso)}`
+          } else {
+            url = `${base}/trips/${t.id}/geojson`
           }
 
-          const url =
-            viewMode === 'georide'
-              ? `${baseUrl}/georide/trips/${t.id}/geojson` +
-              `?trackerId=${trackerId}` +
-              `&from=${encodeURIComponent(new Date(t.start_time).toISOString())}` +
-              `&to=${encodeURIComponent(new Date(t.end_time).toISOString())}`
-              : `${baseUrl}/trips/${t.id}/geojson`
-
           const res = await fetch(url)
-          if (!res.ok) { console.error('HTTP', res.status, url); continue }
+          if (!res.ok) { console.error('[MapView] HTTP', res.status, url); continue }
           const data = await res.json()
-          // vérif GeoJSON, puis cache
-          const isFeature = data?.type === 'Feature' && data.geometry?.coordinates
-          const isFC = data?.type === 'FeatureCollection' && Array.isArray(data.features)
-          if (!isFeature && !isFC) { console.error('Non-GeoJSON:', data); continue }
-          setGeojsonFor(t.id, data)
+          const isFeature = data?.type === 'Feature' && data?.geometry
+          const isFC = data?.type === 'FeatureCollection' && Array.isArray(data?.features)
+          if (!isFeature && !isFC) { console.error('[MapView] Non‑GeoJSON', data); continue }
+          setGeojsonFor(cacheKey(viewMode, t), data)
         } catch (e) {
-          console.error('[MapView] Erreur fetch GeoJSON:', e)
+          console.error('[MapView] fetch geojson error', e)
         }
       }
     })()
-  }, [trips, viewMode, dateFrom, dateTo, baseUrl, trackerId, geojsonCache, setGeojsonFor])
+  }, [trips, viewMode, baseUrl, trackerId, geojsonCache, setGeojsonFor])
+
+  const selected = trips.filter(t => t.selected)
 
   return (
     <MapContainer center={[46.2, 6.1]} zoom={11} className="w-full h-full" scrollWheelZoom>
@@ -64,11 +53,11 @@ export default function MapView({ baseUrl, trackerId }: Props) {
         attribution="&copy; OpenStreetMap contributors"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      {trips
-        .filter(t => t.selected && geojsonCache[t.id])
-        .map(t => (
-          <GeoJSON key={t.id} data={geojsonCache[t.id]} style={{ color: 'dodgerblue' }} />
-        ))}
+      {selected.map(t => {
+        const k = cacheKey(viewMode, t)
+        const gj = geojsonCache[k]
+        return gj ? <GeoJSON key={k} data={gj} style={{ color: colorOf(t), weight: 3 }} /> : null
+      })}
     </MapContainer>
   )
 }

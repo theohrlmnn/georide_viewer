@@ -23,7 +23,7 @@ app.use(helmet())
 app.use(cors({ origin: 'http://localhost:5173' }))
 app.use(express.json())
 
-// GET /trips/georide?trackerId=2055973&from=ISO&to=ISO
+// GET /georide/trips?trackerId=2055973&from=ISO&to=ISO
 app.get('/georide/trips', async (req: Request, res: Response) => {
   try {
     const trackerId = req.query.trackerId ? Number(req.query.trackerId) : undefined
@@ -37,20 +37,40 @@ app.get('/georide/trips', async (req: Request, res: Response) => {
   }
 })
 
-// GET /trips/georide/:tripId/geojson?trackerId=...&from=...&to=...
+// GET /georide/trips/:tripId/geojson?trackerId=...&from=...&to=...
+
 app.get('/georide/trips/:id/geojson', async (req: Request, res: Response) => {
   const id = Number(req.params.id)
   const trackerId = Number(req.query.trackerId)
   const from = req.query.from as string | undefined
-  const to   = req.query.to as string | undefined
-  if (!id || !trackerId || !from || !to) {
-    return res.status(400).json({ error: 'id, trackerId, from, to requis' })
+  const to = req.query.to as string | undefined
+
+  if (!Number.isFinite(id) || !Number.isFinite(trackerId)) {
+    //add id and trackerId in the error message
+    return res.status(400).json({ error: `id (${id}) and trackerId (${trackerId}) are required numbers` })
   }
+  if (!from || !to) {
+    return res.status(400).json({ error: 'from and to (ISO) are required' })
+  }
+  const fromDate = new Date(from)
+  const toDate = new Date(to)
+  if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime()) || fromDate >= toDate) {
+    return res.status(400).json({ error: 'invalid from/to' })
+  }
+
   try {
-    const feature = await getTripGeoJSON(new GeorideProvider(), { id, trackerId, from, to })
-    res.json(feature)
-  } catch (e:any) {
-    res.status(500).json({ error: e.message })
+    const feature = await getTripGeoJSON(new GeorideProvider(),{
+      trackerId,
+      id: id,
+      from: fromDate.toISOString(),
+      to: toDate.toISOString(),
+    })
+    return res.json(feature)
+  } catch (e: any) {
+    console.error('GET /georide/trips/:id/geojson failed', {
+      id, trackerId, from, to, message: e?.message,
+    })
+    return res.status(502).json({ error: 'georide upstream error' })
   }
 })
 
@@ -71,7 +91,9 @@ app.post('/trips/import', async (req: Request, res: Response) => {
 
 app.get('/trips', async (req: Request, res: Response) => {
   try {
-    const trips = await listTrips(new LocalProvider(), {})
+    const from = typeof req.query.from === 'string' ? req.query.from : undefined
+    const to = typeof req.query.to === 'string' ? req.query.to : undefined
+    const trips = await listTrips(new LocalProvider(), { from, to })
     res.json(trips)
   } catch (e:any) {
     res.status(500).json({ error: e.message })
