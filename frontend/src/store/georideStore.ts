@@ -1,5 +1,6 @@
 // src/store/georideStore.ts
 import { create } from 'zustand'
+import { API_BASE_URL } from '../config'
 
 export type ViewMode = 'georide' | 'local'
 
@@ -39,6 +40,7 @@ type Actions = {
 
   toggleTrip: (trip: Trip) => void
   fetchTrips: (baseUrl: string, trackerId?: number) => Promise<void>
+  refreshTrips: () => void
 }
 
 // ---------- helpers partagés ----------
@@ -148,6 +150,12 @@ export const useGeoRideStore = create<State & Actions>((set, get) => {
       } finally {
         set({ loading: false })
       }
+    },
+
+    refreshTrips: () => {
+      const { viewMode, dateFrom, dateTo, trackerId } = get()
+      if (viewMode === 'georide' && !trackerId) return
+      get().fetchTrips(API_BASE_URL, trackerId)
     },
   }
 })

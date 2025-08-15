@@ -31,3 +31,8 @@ CREATE TABLE trip_positions (
     address TEXT,
     angle FLOAT
 );
+
+-- Index pour améliorer les performances de tri et de filtrage
+CREATE INDEX IF NOT EXISTS idx_trip_positions_trip_id ON trip_positions(trip_id);
+CREATE INDEX IF NOT EXISTS idx_trip_positions_fix_time ON trip_positions(fix_time);
+CREATE INDEX IF NOT EXISTS idx_trip_positions_trip_time ON trip_positions(trip_id, fix_time);

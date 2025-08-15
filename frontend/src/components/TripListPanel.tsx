@@ -2,6 +2,7 @@ import React, { useEffect } from 'react'
 import { useGeoRideStore, colorOf, normalizeKey } from '../store/georideStore'
 import type { Trip } from '../store/georideStore'
 import TripTimeRange from './TripTimeRange'
+import ImportSingleTripButton from './ImportSingleTripButton'
 import { API_BASE_URL } from '../config'
 
 const keyOf = (t: Trip, idx: number) =>
@@ -48,13 +49,23 @@ export default function TripListPanel() {
                   {km.toFixed(1)} km · {mins} min · {avg} km/h
                 </div>
               </div>
-              <input
-                type="checkbox"
-                className="h-4 w-4"
-                onChange={() => toggleTrip(t)}
-                checked={!!t.selected}
-                onClick={(e) => e.stopPropagation()}
-              />
+              <div className="flex items-center gap-2">
+                {viewMode === 'georide' && (
+                  <ImportSingleTripButton 
+                    tripId={t.id}
+                    trackerId={t.trackerId}
+                    startTime={t.startTime}
+                    endTime={t.endTime}
+                  />
+                )}
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  onChange={() => toggleTrip(t)}
+                  checked={!!t.selected}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
             </li>
           )
         })}

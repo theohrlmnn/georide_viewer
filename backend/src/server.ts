@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 
 import { initDb } from './db/initDb';
-import { importTrips } from './services/tripImporter';
+import { importTrips, importSingleTrip } from './services/tripImporter';
 import { getAllTrips, getTripById, deleteTripById } from './repositories/tripRepository';
 import { getPositionsByTripId } from './repositories/tripPositionsRepository';
 import { getTrips } from './services/georideClient';
@@ -88,6 +88,7 @@ app.post('/trips/import', async (req: Request, res: Response) => {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Erreur inconnue' });
   }
 });
+
 
 app.get('/trips', async (req: Request, res: Response) => {
   try {

@@ -43,8 +43,7 @@ export async function insertTripPositions(tripId: number, positions: Position[])
 }
 
 export async function getPositionsByTripId(tripId: number): Promise<any[]> {
-  const res = await pool.query(
-    `
+  const res = await pool.query(`
     SELECT
       fix_time,
       latitude,
@@ -54,10 +53,19 @@ export async function getPositionsByTripId(tripId: number): Promise<any[]> {
       angle
     FROM trip_positions
     WHERE trip_id = $1
-    ORDER BY fix_time ASC
-    `,
-    [tripId]
-  );
+    ORDER BY fix_time ASC, id ASC
+  `, [tripId]);
 
-  return res.rows;
+  // Double vérification côté application pour s'assurer de l'ordre
+  const sortedPositions = res.rows.sort((a, b) => {
+    const timeA = new Date(a.fix_time).getTime();
+    const timeB = new Date(b.fix_time).getTime();
+    if (timeA !== timeB) {
+      return timeA - timeB;
+    }
+    // Si même timestamp, utiliser l'ID pour un ordre stable
+    return a.id - b.id;
+  });
+
+  return sortedPositions;
 }
