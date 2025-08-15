@@ -2,7 +2,7 @@ import React, { useEffect } from 'react'
 import { useGeoRideStore, colorOf, normalizeKey } from '../store/georideStore'
 import type { Trip } from '../store/georideStore'
 import TripTimeRange from './TripTimeRange'
-import ImportSingleTripButton from './ImportSingleTripButton'
+import ImportSingleTripButton from './ImportSingleTripButton.js'
 import { API_BASE_URL } from '../config'
 
 const keyOf = (t: Trip, idx: number) =>

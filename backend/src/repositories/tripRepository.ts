@@ -3,7 +3,7 @@ import { Trip } from '../types';
 
 export async function tripExists(tripId: number): Promise<boolean> {
   const res = await pool.query(
-    'SELECT 1 FROM trips WHERE trip_id = $1 LIMIT 1',
+    'SELECT 1 FROM trips WHERE id = $1 LIMIT 1',
     [tripId]
   );
   return (res.rowCount ?? 0) > 0;
@@ -12,7 +12,7 @@ export async function tripExists(tripId: number): Promise<boolean> {
 export async function insertTrip(trip: Trip): Promise<void> {
   await pool.query(
     `INSERT INTO trips (
-      trip_id, trackerId, startTime, endTime,
+      id, trackerId, startTime, endTime,
       startLat, startLon, endLat, endLon,
       distance, averageSpeed, maxSpeed, duration,
       startAddress, endAddress, staticImage,
@@ -52,7 +52,7 @@ export async function insertTrip(trip: Trip): Promise<void> {
 export async function getAllTrips(from?: string, to?: string): Promise<Trip[]> {
   let query = `
     SELECT
-      trip_id AS id,
+      id AS id,
       trackerId,
       startTime,
       endTime,
@@ -107,7 +107,7 @@ export async function getAllTrips(from?: string, to?: string): Promise<Trip[]> {
 export async function getTripById(tripId: number): Promise<Trip | null> {
   const res = await pool.query(`
     SELECT
-      trip_id AS id,
+      id AS id,
       trackerId,
       startTime,
       endTime,
@@ -127,7 +127,7 @@ export async function getTripById(tripId: number): Promise<Trip | null> {
       maxRightAngle,
       averageAngle
     FROM trips
-    WHERE trip_id = $1;
+    WHERE id = $1;
   `, [tripId]);
 
   if (res.rowCount === 0) return null;
@@ -137,5 +137,5 @@ export async function getTripById(tripId: number): Promise<Trip | null> {
 }
 
 export async function deleteTripById(tripId: number): Promise<void> {
-  await pool.query('DELETE FROM trips WHERE trip_id = $1', [tripId]);
+  await pool.query('DELETE FROM trips WHERE id = $1', [tripId]);
 }

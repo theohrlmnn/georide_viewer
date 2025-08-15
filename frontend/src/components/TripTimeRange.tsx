@@ -13,7 +13,7 @@ export interface TripTimeRangeProps {
  * Calcule des bornes sûres pour GeoRide:
  * - si `end` est manquant → now
  * - si `start` est manquant → end - fallbackHours
- * - renvoie les ISO prêtes pour l’API + des Date pour l’affichage
+ * - renvoie les ISO prêtes pour l'API + des Date pour l'affichage
  */
 export function resolveBounds(
   start?: string | null,
@@ -36,6 +36,15 @@ export function resolveBounds(
   }
 }
 
+function formatDate(date: Date | undefined) {
+  if (!date) return ""
+  return date.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  })
+}
+
 export default function TripTimeRange({
   start,
   end,
@@ -53,7 +62,6 @@ export default function TripTimeRange({
         'text-gray-800 bg-gray-200 font-semibold px-2 py-1 rounded-md inline-flex items-center gap-2 ' +
         className
       }
-  
     >
       <span>{dtDateTime.format(startDate)}</span>
       <span>→</span>

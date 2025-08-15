@@ -22,7 +22,7 @@ export interface Trip {
 }
 
 export interface Position {
-  fix_time: string;
+  fixtime: string;
   latitude: number;
   longitude: number;
   speed: number;

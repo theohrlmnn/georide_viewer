@@ -33,7 +33,7 @@ export class GeorideProvider implements TripProvider {
     const raw = await res.json()
 
     return raw.map((p: any): Position => ({
-        fix_time: p.fix_time,
+      fixtime: p.fixtime,
         latitude: p.latitude,
         longitude: p.longitude,
         speed: p.speed,

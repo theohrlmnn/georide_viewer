@@ -3,7 +3,7 @@ import pool from "./index";
 export async function initDb() {
   const createTripsTable = `
     CREATE TABLE IF NOT EXISTS trips (
-      trip_id INT PRIMARY KEY,
+      id INT PRIMARY KEY,
       trackerId INT NOT NULL,
       startTime TIMESTAMPTZ NOT NULL,
       endTime TIMESTAMPTZ NOT NULL,
@@ -27,8 +27,8 @@ export async function initDb() {
     const createTripPositions = `
       CREATE TABLE IF NOT EXISTS trip_positions (
         id SERIAL PRIMARY KEY,
-        trip_id INT NOT NULL REFERENCES trips(trip_id) ON DELETE CASCADE,
-        fix_time TIMESTAMPTZ,
+        id INT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+        fixtime TIMESTAMPTZ,
         latitude DOUBLE PRECISION NOT NULL,
         longitude DOUBLE PRECISION NOT NULL,
         speed FLOAT,
@@ -37,10 +37,18 @@ export async function initDb() {
       );
     `;
 
+  const createIndexes = `
+    CREATE INDEX IF NOT EXISTS idx_trip_positions_id ON trip_positions(id);
+    CREATE INDEX IF NOT EXISTS idx_trip_positions_fixtime ON trip_positions(fixtime);
+    CREATE INDEX IF NOT EXISTS idx_trip_positions_trip_time ON trip_positions(id, fixtime);
+  `;
+
   try {
     await pool.query(createTripsTable);
     await pool.query(createTripPositions);
-    console.log('✅ Table "trips" vérifiée / créée');
+    await pool.query(createIndexes);
+    console.log('✅ Tables vérifiées / créées');
+    console.log('✅ Index créés pour les performances');
   } catch (err) {
     console.error('❌ Erreur lors de l’initialisation de la base :', err);
     throw err;

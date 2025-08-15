@@ -12,7 +12,7 @@ export async function getTripGeoJSON(provider: TripProvider, args: GeojsonArgs):
   return {
     type: 'Feature',
     properties: {
-      trip_id: args.id,
+      id: args.id,
       source: provider.constructor.name.replace('Provider', '').toLowerCase(), // "georide" | "local"
       trackerId: args.trackerId ?? null,
       from: args.from ?? null,
