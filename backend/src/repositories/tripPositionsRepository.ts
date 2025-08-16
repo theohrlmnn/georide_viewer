@@ -17,7 +17,7 @@ export async function insertTripPositions(tripId: number, positions: Position[])
     for (const pos of positions) {
       await client.query(
         `INSERT INTO trip_positions (
-          id, fixtime, latitude, longitude, speed, address, angle
+          idTrip, fixtime, latitude, longitude, speed, address, angle
         ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           tripId,
@@ -52,8 +52,8 @@ export async function getPositionsByTripId(tripId: number): Promise<any[]> {
       address,
       angle
     FROM trip_positions
-    WHERE id = $1
-    ORDER BY fixtime ASC, id ASC
+    WHERE idTrip = $1
+    ORDER BY fixtime ASC, idTrip ASC
   `, [tripId]);
 
   // Double vérification côté application pour s'assurer de l'ordre

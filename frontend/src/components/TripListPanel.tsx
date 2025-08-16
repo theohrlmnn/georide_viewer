@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react'
-import { useGeoRideStore, colorOf, normalizeKey } from '../store/georideStore'
+import { useEffect } from 'react'
+import { useGeoRideStore, colorOf } from '../store/georideStore'
 import type { Trip } from '../store/georideStore'
-import TripTimeRange from './TripTimeRange'
-import ImportSingleTripButton from './ImportSingleTripButton.js'
+import TripListItem from './TripListItem'
+import ShowAllTripsToggle from './ShowAllTripsToggle'
 import { API_BASE_URL } from '../config'
 
 const keyOf = (t: Trip, idx: number) =>
@@ -13,63 +13,55 @@ export default function TripListPanel() {
   const dateFrom    = useGeoRideStore(s => s.dateFrom)
   const dateTo      = useGeoRideStore(s => s.dateTo)
   const trackerId   = useGeoRideStore(s => s.trackerId)
+  const showAllTrips = useGeoRideStore(s => s.showAllTrips)
   const fetchTrips  = useGeoRideStore(s => s.fetchTrips)
-  const resetDateRange = useGeoRideStore(s => s.resetDateRange)
 
   useEffect(() => {
     if (viewMode === 'georide' && !trackerId) return
     fetchTrips(API_BASE_URL, trackerId)
-  }, [viewMode, dateFrom, dateTo, trackerId, fetchTrips])
+  }, [viewMode, dateFrom, dateTo, trackerId, showAllTrips, fetchTrips])
 
   const trips = useGeoRideStore(s => s.trips)
   const toggleTrip = useGeoRideStore(s => s.toggleTrip)
 
   return (
-    <div className="bg-white/80 rounded-2xl shadow-xl p-4 max-h-[40vh] overflow-y-auto w-80">
-      {trips.length === 0 && <p className="text-sm text-gray-500">Aucun trajet</p>}
-      <ul className="space-y-2">
-        {trips.map((t, idx) => {
-          const km   = (t.distance ?? 0) / 1000
-          const mins = Math.round((t.duration ?? 0) / 60)
-          const avg  = Math.round(t.averageSpeed ?? 0)
-          
-          return (
-            <li
-              key={keyOf(t, idx)}
-              className={`border rounded-lg p-2 cursor-pointer flex items-center gap-2 ${t.selected ? 'bg-blue-100 border-blue-400' : 'bg-white'}`}
-              onClick={() => toggleTrip(t)}
-              title={normalizeKey(t)}
-            >
-              <span className="inline-block h-3 w-3 rounded-full" style={{ background: colorOf(t) }} />
-              <div className="flex-1">
-                <div className="text-sm font-medium">
-                  <TripTimeRange start={t.startTime} end={t.endTime} />
-                </div>
-                <div className="text-xs text-gray-600">
-                  {km.toFixed(1)} km · {mins} min · {avg} km/h
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {viewMode === 'georide' && (
-                  <ImportSingleTripButton 
-                    tripId={t.id}
-                    trackerId={t.trackerId}
-                    startTime={t.startTime}
-                    endTime={t.endTime}
-                  />
-                )}
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  onChange={() => toggleTrip(t)}
-                  checked={!!t.selected}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-            </li>
-          )
-        })}
-      </ul>
+    <div className="w-full flex flex-col space-y-3">
+      <ShowAllTripsToggle />
+
+      {trips.length === 0 && (
+        <p className="text-sm text-gray-200">Aucun trajet</p>
+      )}
+      
+      {/* Liste avec hauteur max et scroll stylé */}
+      <div className="relative">
+        <ul className="space-y-2 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+          {trips.map((trip, idx) => (
+            <TripListItem
+              key={keyOf(trip, idx)}
+              trip={trip}
+              onToggle={toggleTrip}
+              color={colorOf(trip)}
+              showImportButton={true}
+              viewMode={viewMode}
+            />
+          ))}
+        </ul>
+        
+        {/* Indicateur de scroll si nécessaire */}
+        {trips.length > 5 && (
+          <div className="absolute -right-1 top-2 text-gray-400 text-xs scroll-indicator">
+            <div className="flex flex-col items-center gap-1">
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+              </svg>
+              <div className="w-px h-4 bg-gray-600"></div>
+              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -1,57 +1,68 @@
-import React from 'react'
+
 import TripTimeRange from './TripTimeRange'
-import type { GeoRideTrip } from '../types/GeoRideTrip'
+import ImportSingleTripButton from './ImportSingleTripButton'
+import type { Trip } from '../store/georideStore'
 
 type Props = {
-  trip: GeoRideTrip
-  onToggle: (id: number) => void
+  trip: Trip
+  onToggle: (trip: Trip) => void
   color?: string // optionnel: couleur de couche sur la carte
+  showImportButton?: boolean
+  viewMode?: 'georide' | 'local'
 }
 
-export default function TripListItem({ trip, onToggle, color }: Props) {
+export default function TripListItem({ 
+  trip, 
+  onToggle, 
+  color, 
+  showImportButton = false, 
+  viewMode = 'local' 
+}: Props) {
   const km = (trip.distance ?? 0) / 1000
   const mins = Math.round((trip.duration ?? 0) / 60)
+  const avg = Math.round(trip.averageSpeed ?? 0)
 
   return (
     <li
-      className={`p-3 rounded-lg border transition cursor-pointer
-                 ${trip.selected ? 'bg-blue-50 border-blue-300' : 'bg-white/80 border-gray-200'}
+      className={`border rounded-lg p-2 cursor-pointer flex items-center gap-2 transition-colors duration-200 w-full
+                 ${trip.selected ? 'bg-blue-100 border-blue-400' : 'bg-white border-gray-200'}
                  hover:bg-blue-50`}
-      onClick={() => onToggle(trip.id)}
+      style={{ width: '100%' }}
+      onClick={() => onToggle(trip)}
     >
-      <div className="flex items-center gap-3">
-        {/* Checkbox */}
-        <input
-          type="checkbox"
-          checked={!!trip.selected}
-          onChange={() => onToggle(trip.id)}
-          onClick={(e) => e.stopPropagation()}
-          className="accent-blue-600 h-4 w-4"
-          aria-label={`Sélectionner le trajet ${trip.id}`}
-        />
-
-        {/* Pastille couleur (optionnelle) */}
-        {color && (
-          <span
-            className="inline-block h-3 w-3 rounded-full ring-1 ring-black/10"
-            style={{ backgroundColor: color }}
-            aria-hidden
+      {/* Pastille couleur */}
+      <span 
+        className="inline-block h-3 w-3 rounded-full flex-shrink-0" 
+        style={{ background: color || '#6b7280' }} 
+      />
+      
+      {/* Contenu principal */}
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium">
+          <TripTimeRange start={trip.startTime} end={trip.endTime} />
+        </div>
+        <div className="text-xs text-gray-600">
+          {km.toFixed(1)} km · {mins} min · {avg} km/h
+        </div>
+      </div>
+      
+      {/* Actions */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {showImportButton && viewMode === 'georide' && (
+          <ImportSingleTripButton 
+            tripId={trip.id}
+            trackerId={trip.trackerId}
+            startTime={trip.startTime}
+            endTime={trip.endTime}
           />
         )}
-
-        {/* Contenu principal */}
-        <div className="flex-1 min-w-0">
-          <TripTimeRange start={trip.startTime} end={trip.endTime} />
-          <div className="text-xs text-gray-600 mt-1 truncate">
-            {trip.startTime || 'Départ inconnu'} → {trip.endTime || 'Arrivée inconnue'}
-          </div>
-        </div>
-
-        {/* Chiffres clés */}
-        <div className="text-right text-sm">
-          <div className="font-semibold">{km.toFixed(1)} km</div>
-          <div className="text-gray-500">{mins} min</div>
-        </div>
+        <input
+          type="checkbox"
+          className="h-4 w-4 accent-blue-600"
+          onChange={() => onToggle(trip)}
+          checked={!!trip.selected}
+          onClick={(e) => e.stopPropagation()}
+        />
       </div>
     </li>
   )

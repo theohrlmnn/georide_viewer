@@ -27,7 +27,7 @@ export async function initDb() {
     const createTripPositions = `
       CREATE TABLE IF NOT EXISTS trip_positions (
         id SERIAL PRIMARY KEY,
-        id INT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+        idTrip INT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
         fixtime TIMESTAMPTZ,
         latitude DOUBLE PRECISION NOT NULL,
         longitude DOUBLE PRECISION NOT NULL,

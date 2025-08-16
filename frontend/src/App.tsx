@@ -1,14 +1,28 @@
 // src/App.tsx
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import MapView from './components/MapView'
 import MenuSwitch from './components/MenuSwitch'
 import TripListPanel from './components/TripListPanel'
+import DateOnlyRangePicker from './components/DateOnlyRangePicker'
+import DateRangeStatus from './components/DateRangeStatus'
+import TripQuickSearch from './components/TripQuickSearch'
+
 import { useGeoRideStore } from './store/georideStore'
 import { API_BASE_URL } from './config'
 
 const trackerId = 2055973
-const toIso = (v?: string) => (v ? new Date(v).toISOString() : undefined)
-const toInputValue = (iso?: string) => (iso ? new Date(iso).toISOString().slice(0, 16) : '')
+const toIso = (dateStr?: string) => {
+  if (!dateStr) return undefined
+  // Convertir YYYY-MM-DD vers ISO avec heure de début/fin de journée
+  const date = new Date(dateStr + 'T00:00:00')
+  return date.toISOString()
+}
+
+const toDateValue = (iso?: string) => {
+  if (!iso) return ''
+  // Convertir ISO vers YYYY-MM-DD
+  return new Date(iso).toISOString().slice(0, 10)
+}
 
 export default function App() {
   const viewMode     = useGeoRideStore(s => s.viewMode)
@@ -38,24 +52,33 @@ export default function App() {
           <MenuSwitch />
         </div>
 
-        {/* Filtres date */}
-        <div className="bg-gray-900/70 text-white rounded-xl shadow-lg p-3 backdrop-blur-md flex items-end gap-3">
-          <div className="flex flex-col">
-            <label className="text-xs font-medium mb-1">Date début</label>
-            <input
-              type="datetime-local"
-              className="border border-gray-700 rounded px-2 py-1 text-sm bg-gray-800 text-white"
-              value={toInputValue(dateFrom)}
-              onChange={(e) => setDateRange(toIso(e.target.value), dateTo)}
-            />
-          </div>
-          <div className="flex flex-col">
-            <label className="text-xs font-medium mb-1">Date fin</label>
-            <input
-              type="datetime-local"
-              className="border border-gray-700 rounded px-2 py-1 text-sm bg-gray-800 text-white"
-              value={toInputValue(dateTo)}
-              onChange={(e) => setDateRange(dateFrom, toIso(e.target.value))}
+        {/* Recherche rapide */}
+        <div className="bg-gray-900/70 text-white rounded-xl shadow-lg p-3 backdrop-blur-md">
+          <TripQuickSearch
+            onDateRangeSelect={(start, end) => setDateRange(toIso(start), toIso(end))}
+          />
+        </div>
+
+        {/* Sélecteur de dates précises */}
+        <div className="bg-gray-900/70 text-white rounded-xl shadow-lg p-4 backdrop-blur-md">
+          <DateOnlyRangePicker
+            startValue={toDateValue(dateFrom)}
+            endValue={toDateValue(dateTo)}
+            onStartChange={(value) => {
+              // Pour date début, on prend 00:00:00
+              const startIso = value ? new Date(value + 'T00:00:00').toISOString() : undefined
+              setDateRange(startIso, dateTo)
+            }}
+            onEndChange={(value) => {
+              // Pour date fin, on prend 23:59:59 pour inclure toute la journée
+              const endIso = value ? new Date(value + 'T23:59:59').toISOString() : undefined
+              setDateRange(dateFrom, endIso)
+            }}
+          />
+          <div className="mt-3 pt-3 border-t border-gray-600/50">
+            <DateRangeStatus
+              startDate={dateFrom}
+              endDate={dateTo}
             />
           </div>
         </div>

@@ -22,6 +22,7 @@ type State = {
   dateFrom?: string
   dateTo?: string
   trackerId?: number
+  showAllTrips: boolean
   trips: Trip[]
   geojsonCache: GeojsonCache
   loading: boolean
@@ -33,6 +34,7 @@ type Actions = {
   setDateRange: (from?: string, to?: string) => void
   resetDateRange: () => void
   setTrackerId: (id?: number) => void
+  setShowAllTrips: (show: boolean) => void
 
   resetGeojson: () => void
   clearTrips: () => void
@@ -81,19 +83,20 @@ const buildTripsUrl = (
   mode: ViewMode,
   from?: string,
   to?: string,
-  trackerId?: number
+  trackerId?: number,
+  showAllTrips?: boolean
 ) => {
   const base = strip(baseUrl)
   if (mode === 'georide') {
     const p = new URLSearchParams()
     if (trackerId != null) p.set('trackerId', String(trackerId))
-    if (from) p.set('from', from)
-    if (to) p.set('to', to)
+    if (from && !showAllTrips) p.set('from', from)
+    if (to && !showAllTrips) p.set('to', to)
     return `${base}/georide/trips?${p.toString()}`
   }
   const p = new URLSearchParams()
-  if (from) p.set('from', from)
-  if (to) p.set('to', to)
+  if (from && !showAllTrips) p.set('from', from)
+  if (to && !showAllTrips) p.set('to', to)
   const qs = p.toString()
   return qs ? `${base}/trips?${qs}` : `${base}/trips`
 }
@@ -106,6 +109,7 @@ export const useGeoRideStore = create<State & Actions>((set, get) => {
     viewMode: 'georide',
     dateFrom: defaultDates.from,
     dateTo: defaultDates.to,
+    showAllTrips: false,
     trips: [],
     geojsonCache: {},
     loading: false,
@@ -114,6 +118,7 @@ export const useGeoRideStore = create<State & Actions>((set, get) => {
     setDateRange: (from, to) => set({ dateFrom: from, dateTo: to }),
     resetDateRange: () => set({ dateFrom: defaultDates.from, dateTo: defaultDates.to }),
     setTrackerId: (id) => set({ trackerId: id }),
+    setShowAllTrips: (show) => set({ showAllTrips: show }),
 
     resetGeojson: () => set({ geojsonCache: {} }),
     clearTrips: () => set({ trips: [] }),
@@ -129,11 +134,11 @@ export const useGeoRideStore = create<State & Actions>((set, get) => {
     })),
 
     fetchTrips: async (baseUrl: string, trackerId?: number) => {
-      const { viewMode, dateFrom, dateTo, trips } = get()
+      const { viewMode, dateFrom, dateTo, showAllTrips, trips } = get()
       set({ loading: true, error: undefined })
       try {
         const prevMap = new Map(trips.map(t => [normalizeKey(t), !!t.selected]))
-        const url = buildTripsUrl(baseUrl, viewMode, dateFrom, dateTo, trackerId ?? get().trackerId)
+        const url = buildTripsUrl(baseUrl, viewMode, dateFrom, dateTo, trackerId ?? get().trackerId, showAllTrips)
         const res = await fetch(url)
         if (!res.ok) throw new Error(`HTTP ${res.status} on ${url}`)
         const incoming: Trip[] = await res.json()
@@ -153,7 +158,7 @@ export const useGeoRideStore = create<State & Actions>((set, get) => {
     },
 
     refreshTrips: () => {
-      const { viewMode, dateFrom, dateTo, trackerId } = get()
+      const { viewMode, trackerId } = get()
       if (viewMode === 'georide' && !trackerId) return
       get().fetchTrips(API_BASE_URL, trackerId)
     },
