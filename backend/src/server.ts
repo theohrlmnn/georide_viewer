@@ -4,10 +4,9 @@ import dotenv from 'dotenv';
 
 import { initDb } from './db/initDb';
 import pool from './db/index';
-import { importTrips, importSingleTrip } from './services/tripImporter';
+import { importTrips } from './services/tripImporter';
 import { getAllTrips, getTripById, deleteTripById } from './repositories/tripRepository';
 import { getPositionsByTripId } from './repositories/tripPositionsRepository';
-import { getTrips } from './services/georideClient';
 
 import { GeorideProvider } from './providers/georideProvider'
 import { LocalProvider } from './providers/localProvider'

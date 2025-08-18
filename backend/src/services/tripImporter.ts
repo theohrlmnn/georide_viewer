@@ -104,20 +104,3 @@ export async function importTrips(trackerId: number, from: string, to: string) {
     }
   }
 }
-
-export async function importSingleTrip(tripId: number) {
-  // Vérifier si le trajet existe déjà
-  const exists = await tripExists(tripId);
-  if (exists) {
-    throw new Error(`Le trajet ${tripId} est déjà importé`);
-  }
-
-  // Récupérer le trajet depuis GeoRide
-  // Note: Cette fonction nécessite de connaître le trackerId et les dates
-  // Pour l'instant, on utilise une approche simplifiée
-  console.log(`➡️ Import du trip ${tripId}`);
-  
-  // TODO: Implémenter la récupération du trajet spécifique depuis GeoRide
-  // Cela nécessite de modifier l'API GeoRide pour récupérer un trajet par ID
-  throw new Error('Import de trajet individuel non encore implémenté - utilisez l\'import par période');
-}
