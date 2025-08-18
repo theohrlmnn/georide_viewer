@@ -1,7 +1,7 @@
 import fetch from 'node-fetch'
 import type { TripProvider, ListArgs, GeojsonArgs } from './tripProvider'
 import type { Trip, Position } from '../types'
-//import { getGeoRideToken } from '../services/tokenService' // <-- ton service token existant
+import { getCachedPositions } from '../services/georideCache'
 
 const BASE = 'https://api.georide.com'
 
@@ -24,21 +24,8 @@ export class GeorideProvider implements TripProvider {
 
   async getPositions({ trackerId, from, to }: GeojsonArgs): Promise<Position[]> {
     if (!trackerId || !from || !to) throw new Error('trackerId, from, to requis')
-    const token = process.env.GEORIDE_API_TOKEN 
-    const qs = new URLSearchParams({ from, to })
-    const url = `${BASE}/tracker/${trackerId}/trips/positions?${qs}`
-
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-    if (!res.ok) throw new Error(`GeoRide error: ${res.status}`)
-    const raw = await res.json()
-
-    return raw.map((p: any): Position => ({
-      fixtime: p.fixtime,
-        latitude: p.latitude,
-        longitude: p.longitude,
-        speed: p.speed,
-        address: p.address,
-        angle: p.angle,
-    }))
+    
+    // Utiliser le cache pour éviter les requêtes multiples vers GeoRide
+    return getCachedPositions(trackerId, from, to)
   }
 }

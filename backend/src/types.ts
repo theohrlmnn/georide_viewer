@@ -19,6 +19,10 @@ export interface Trip {
   maxRightAngle: number;
   averageAngle: number;
   raw?: any;
+  // Colonnes PostGIS (optionnelles pour la compatibilité)
+  startGeom?: string; // WKT ou GeoJSON string
+  endGeom?: string;
+  routeGeom?: string;
 }
 
 export interface Position {
@@ -28,6 +32,8 @@ export interface Position {
   speed: number;
   address: string;
   angle: number;
+  // Colonne PostGIS (optionnelle pour la compatibilité)
+  geom?: string; // WKT ou GeoJSON string
 }
 
 export interface GeoJSONFeature {

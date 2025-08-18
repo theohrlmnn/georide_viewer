@@ -4,7 +4,7 @@ import { usePortal } from '../hooks/usePortal'
 interface DropdownProps {
   isOpen: boolean
   onClose: () => void
-  triggerRef: React.RefObject<HTMLElement>
+  triggerRef: React.RefObject<HTMLElement | null>
   children: React.ReactNode
   className?: string
   align?: 'left' | 'right' | 'center'
@@ -70,9 +70,15 @@ export default function Dropdown({
 
     updatePosition()
     
-    // Recalculer lors du redimensionnement ou du défilement
+    // Recalculer lors du redimensionnement ou du défilement (mais pas du scroll interne)
     const handleResize = () => updatePosition()
-    const handleScroll = () => updatePosition()
+    const handleScroll = (event: Event) => {
+      // Ne pas repositionner si le scroll vient du dropdown lui-même
+      if (dropdownRef.current && dropdownRef.current.contains(event.target as Node)) {
+        return
+      }
+      updatePosition()
+    }
     
     window.addEventListener('resize', handleResize)
     window.addEventListener('scroll', handleScroll, true)

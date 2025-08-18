@@ -25,16 +25,21 @@ export default function TripListPanel() {
   const toggleTrip = useGeoRideStore(s => s.toggleTrip)
 
   return (
-    <div className="w-full flex flex-col space-y-3">
-      <ShowAllTripsToggle />
+    <div className="w-full max-w-[420px] flex flex-col space-y-3">
+      {/* Réserver l'espace pour le toggle seulement en mode local */}
+      {viewMode === 'local' ? (
+        <div className="min-h-[68px]">
+          <ShowAllTripsToggle />
+        </div>
+      ) : null}
 
       {trips.length === 0 && (
         <p className="text-sm text-gray-200">Aucun trajet</p>
       )}
       
       {/* Liste avec hauteur max et scroll stylé */}
-      <div className="relative">
-        <ul className="space-y-2 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
+      <div className="relative overflow-hidden">
+        <ul className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
           {trips.map((trip, idx) => (
             <TripListItem
               key={keyOf(trip, idx)}
@@ -48,7 +53,7 @@ export default function TripListPanel() {
         </ul>
         
         {/* Indicateur de scroll si nécessaire */}
-        {trips.length > 5 && (
+        {trips.length > 4 && (
           <div className="absolute -right-1 top-2 text-gray-400 text-xs scroll-indicator">
             <div className="flex flex-col items-center gap-1">
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">

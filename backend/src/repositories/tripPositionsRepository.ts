@@ -17,8 +17,8 @@ export async function insertTripPositions(tripId: number, positions: Position[])
     for (const pos of positions) {
       await client.query(
         `INSERT INTO trip_positions (
-          idTrip, fixtime, latitude, longitude, speed, address, angle
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          idTrip, fixtime, latitude, longitude, speed, address, angle, geom
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, ST_SetSRID(ST_MakePoint($8, $9), 4326))`,
         [
           tripId,
           pos.fixtime,
@@ -26,16 +26,18 @@ export async function insertTripPositions(tripId: number, positions: Position[])
           pos.longitude,
           pos.speed,
           pos.address,
-          pos.angle
+          pos.angle,
+          pos.longitude, // longitude pour la géométrie
+          pos.latitude   // latitude pour la géométrie
         ]
       );
     }
 
     await client.query('COMMIT');
-    console.log(`✅ ${positions.length} positions insérées pour id=${tripId}`);
+    console.log(`✅ ${positions.length} positions insérées avec géométries PostGIS pour id=${tripId}`);
   } catch (err) {
     await client.query('ROLLBACK');
-    console.error('❌ Erreur lors de l’insertion des positions :', err);
+    console.error('Erreur lors de l\'insertion des positions :', err);
     throw err;
   } finally {
     client.release();
@@ -50,7 +52,8 @@ export async function getPositionsByTripId(tripId: number): Promise<any[]> {
       longitude,
       speed,
       address,
-      angle
+      angle,
+      ST_AsGeoJSON(geom) AS geom
     FROM trip_positions
     WHERE idTrip = $1
     ORDER BY fixtime ASC, idTrip ASC

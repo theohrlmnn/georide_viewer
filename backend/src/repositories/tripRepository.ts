@@ -16,13 +16,16 @@ export async function insertTrip(trip: Trip): Promise<void> {
       startLat, startLon, endLat, endLon,
       distance, averageSpeed, maxSpeed, duration,
       startAddress, endAddress, staticImage,
-      maxAngle, maxLeftAngle, maxRightAngle, averageAngle, raw
+      maxAngle, maxLeftAngle, maxRightAngle, averageAngle, raw,
+      startGeom, endGeom
     ) VALUES (
       $1, $2, $3, $4,
       $5, $6, $7, $8,
       $9, $10, $11, $12,
       $13, $14, $15,
-      $16, $17, $18, $19, $20
+      $16, $17, $18, $19, $20,
+      ST_SetSRID(ST_MakePoint($21, $22), 4326),
+      ST_SetSRID(ST_MakePoint($23, $24), 4326)
     )`,
     [
       trip.id,
@@ -44,7 +47,12 @@ export async function insertTrip(trip: Trip): Promise<void> {
       trip.maxLeftAngle,
       trip.maxRightAngle,
       trip.averageAngle,
-      JSON.stringify(trip) // stockage JSON brut
+      JSON.stringify(trip), // stockage JSON brut
+      // Coordonnées pour les géométries PostGIS
+      trip.startLon, // longitude pour startGeom
+      trip.startLat, // latitude pour startGeom
+      trip.endLon,   // longitude pour endGeom
+      trip.endLat    // latitude pour endGeom
     ]
   );
 }
@@ -52,25 +60,29 @@ export async function insertTrip(trip: Trip): Promise<void> {
 export async function getAllTrips(from?: string, to?: string): Promise<Trip[]> {
   let query = `
     SELECT
-      id AS id,
-      trackerId,
-      startTime,
-      endTime,
-      startLat,
-      startLon,
-      endLat,
-      endLon,
+      id,
+      trackerId AS "trackerId",
+      startTime AS "startTime",
+      endTime AS "endTime",
+      startLat AS "startLat",
+      startLon AS "startLon",
+      endLat AS "endLat",
+      endLon AS "endLon",
       distance,
-      averageSpeed,
-      maxSpeed,
+      averageSpeed AS "averageSpeed",
+      maxSpeed AS "maxSpeed",
       duration,
-      startAddress,
-      endAddress,
-      staticImage,
-      maxAngle,
-      maxLeftAngle,
-      maxRightAngle,
-      averageAngle
+      startAddress AS "startAddress",
+      endAddress AS "endAddress",
+      staticImage AS "staticImage",
+      maxAngle AS "maxAngle",
+      maxLeftAngle AS "maxLeftAngle",
+      maxRightAngle AS "maxRightAngle",
+      averageAngle AS "averageAngle",
+      -- Géométries PostGIS en GeoJSON pour faciliter l'utilisation
+      ST_AsGeoJSON(startGeom) AS "startGeom",
+      ST_AsGeoJSON(endGeom) AS "endGeom",
+      ST_AsGeoJSON(routeGeom) AS "routeGeom"
     FROM trips
   `;
   
@@ -107,25 +119,29 @@ export async function getAllTrips(from?: string, to?: string): Promise<Trip[]> {
 export async function getTripById(tripId: number): Promise<Trip | null> {
   const res = await pool.query(`
     SELECT
-      id AS id,
-      trackerId,
-      startTime,
-      endTime,
-      startLat,
-      startLon,
-      endLat,
-      endLon,
+      id,
+      trackerId AS "trackerId",
+      startTime AS "startTime",
+      endTime AS "endTime",
+      startLat AS "startLat",
+      startLon AS "startLon",
+      endLat AS "endLat",
+      endLon AS "endLon",
       distance,
-      averageSpeed,
-      maxSpeed,
+      averageSpeed AS "averageSpeed",
+      maxSpeed AS "maxSpeed",
       duration,
-      startAddress,
-      endAddress,
-      staticImage,
-      maxAngle,
-      maxLeftAngle,
-      maxRightAngle,
-      averageAngle
+      startAddress AS "startAddress",
+      endAddress AS "endAddress",
+      staticImage AS "staticImage",
+      maxAngle AS "maxAngle",
+      maxLeftAngle AS "maxLeftAngle",
+      maxRightAngle AS "maxRightAngle",
+      averageAngle AS "averageAngle",
+      -- Géométries PostGIS en GeoJSON
+      ST_AsGeoJSON(startGeom) AS "startGeom",
+      ST_AsGeoJSON(endGeom) AS "endGeom",
+      ST_AsGeoJSON(routeGeom) AS "routeGeom"
     FROM trips
     WHERE id = $1;
   `, [tripId]);

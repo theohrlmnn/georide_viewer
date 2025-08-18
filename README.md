@@ -91,4 +91,64 @@ L'objectif est double :
 
 Il est conçu pour évoluer vers une **application complète de gestion et visualisation GPS**.
 
+---
+
+## 📋 Déploiement et Production
+
+### Checklist de déploiement
+Pour un déploiement en production sécurisé et fiable, consultez la **[Checklist de Déploiement](./DEPLOYMENT_CHECKLIST.md)** qui couvre :
+
+- ✅ **Configuration** et pré-requis
+- ✅ **Tests** et validation des fonctionnalités  
+- ✅ **Sécurité** et gestion des secrets
+- ✅ **Conteneurisation** Docker
+- ✅ **Monitoring** et maintenance
+- ✅ **Procédures d'urgence** et rollback
+- ✅ **Système de versioning** de base de données
+- ✅ **Régénération** depuis les données brutes
+
+### Fonctionnalités de production
+- 🔄 **Migration de base de données** avec versioning
+- 📦 **Régénération des données** depuis les sources brutes GeoRide
+- 🐳 **Conteneurisation** complète avec Docker Compose
+- 📊 **Monitoring** avec métriques et health checks
+- 🔒 **Sécurité** avec gestion des secrets et variables d'environnement
+- ⚡ **Cache intelligent** pour optimiser les performances
+- 🗄️ **PostGIS** avec index spatiaux pour les requêtes géographiques
+
+---
+
+## 🚀 Installation et Développement
+
+### Pré-requis
+- Node.js 18+
+- PostgreSQL 15+ avec PostGIS
+- Clés API GeoRide
+
+### Démarrage rapide
+```bash
+# Cloner le projet
+git clone <repo-url>
+cd georide-viewer
+
+# Backend
+cd backend
+npm install
+cp .env.example .env  # Configurer les variables
+npm run dev
+
+# Frontend (nouveau terminal)
+cd frontend  
+npm install
+npm run dev
+```
+
+### Configuration
+1. Créer la base de données PostgreSQL
+2. Configurer les variables d'environnement (`.env`)
+3. Lancer les migrations : `npm run db:migrate`
+4. Importer des données de test
+
+---
+
 

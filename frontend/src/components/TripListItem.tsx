@@ -18,16 +18,24 @@ export default function TripListItem({
   showImportButton = false, 
   viewMode = 'local' 
 }: Props) {
+  // Conversion distance : mètres → kilomètres
   const km = (trip.distance ?? 0) / 1000
-  const mins = Math.round((trip.duration ?? 0) / 60)
-  const avg = Math.round(trip.averageSpeed ?? 0)
+  
+  // Conversion durée : millisecondes → heures et minutes
+  const totalMinutes = Math.round((trip.duration ?? 0) / (1000 * 60))
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  
+  // Conversion vitesse : nœuds → km/h (1 nœud = 1.852 km/h)
+  const avgKmh = Math.round((trip.averageSpeed ?? 0) * 1.852)
+  
+
 
   return (
     <li
-      className={`border rounded-lg p-2 cursor-pointer flex items-center gap-2 transition-colors duration-200 w-full
+      className={`border rounded-lg p-2 cursor-pointer flex items-center gap-2 transition-colors duration-200 w-full max-w-full overflow-hidden
                  ${trip.selected ? 'bg-blue-100 border-blue-400' : 'bg-white border-gray-200'}
                  hover:bg-blue-50`}
-      style={{ width: '100%' }}
       onClick={() => onToggle(trip)}
     >
       {/* Pastille couleur */}
@@ -42,7 +50,7 @@ export default function TripListItem({
           <TripTimeRange start={trip.startTime} end={trip.endTime} />
         </div>
         <div className="text-xs text-gray-600">
-          {km.toFixed(1)} km · {mins} min · {avg} km/h
+          {km.toFixed(1)} km · {hours > 0 ? `${hours}h ${minutes}min` : `${minutes}min`} · {avgKmh} km/h
         </div>
       </div>
       

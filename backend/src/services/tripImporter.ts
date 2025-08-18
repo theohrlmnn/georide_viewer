@@ -1,6 +1,8 @@
 import { getTrips, getTripPositions } from './georideClient';
 import { tripExists, insertTrip } from '../repositories/tripRepository';
 import { insertTripPositions, tripHasPositions } from '../repositories/tripPositionsRepository';
+import { buildRouteGeometrySimple } from '../utils/geometryUtils';
+import { preloadPositionsInCache } from './georideCache';
 
 export async function importTrips(trackerId: number, from: string, to: string) {
   const trips = await getTrips(trackerId, from, to);
@@ -29,6 +31,12 @@ export async function importTrips(trackerId: number, from: string, to: string) {
     }));
     
     console.log(`📍 ${allPositions.length} positions normalisées`);
+    
+    // Pré-charger les positions dans le cache pour éviter les requêtes futures
+    if (allPositions.length > 0) {
+      preloadPositionsInCache(trackerId, from, to, allPositions);
+      console.log(`📦 Positions pré-chargées dans le cache GeoRide`);
+    }
   } catch (error) {
     console.error('❌ Erreur lors de la récupération des positions:', error);
     // Continuer l'import des trajets même sans positions
@@ -85,6 +93,9 @@ export async function importTrips(trackerId: number, from: string, to: string) {
       
       if (tripPositions.length > 0) {
         await insertTripPositions(trip.id, tripPositions);
+        
+        // Construire la géométrie de route après insertion des positions
+        await buildRouteGeometrySimple(trip.id);
       } else {
         console.log(`⚠️ Aucune position trouvée pour trip ${trip.id}`);
       }

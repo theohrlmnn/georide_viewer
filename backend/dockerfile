@@ -1,6 +1,9 @@
 # backend/Dockerfile
 FROM node:23-alpine
 
+# Installer curl pour le health check
+RUN apk add --no-cache curl
+
 # Dossier de travail
 WORKDIR /app
 

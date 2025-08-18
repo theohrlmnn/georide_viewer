@@ -1,5 +1,6 @@
 // src/store/georideStore.ts
 import { create } from 'zustand'
+import { apiClient } from '../utils/apiClient'
 import { API_BASE_URL } from '../config'
 
 export type ViewMode = 'georide' | 'local'
@@ -51,9 +52,18 @@ type Actions = {
 const getDefaultDateRange = () => {
   const now = new Date()
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  
+  // Utiliser le format YYYY-MM-DD à midi UTC pour éviter les problèmes de fuseau horaire
+  const formatDateSafe = (date: Date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}T12:00:00.000Z`
+  }
+  
   return {
-    from: yesterday.toISOString(),
-    to: now.toISOString()
+    from: formatDateSafe(yesterday),
+    to: formatDateSafe(now)
   }
 }
 
@@ -116,7 +126,10 @@ export const useGeoRideStore = create<State & Actions>((set, get) => {
 
     setViewMode: (m) => set({ viewMode: m }),
     setDateRange: (from, to) => set({ dateFrom: from, dateTo: to }),
-    resetDateRange: () => set({ dateFrom: defaultDates.from, dateTo: defaultDates.to }),
+    resetDateRange: () => {
+      const newDefaults = getDefaultDateRange()
+      set({ dateFrom: newDefaults.from, dateTo: newDefaults.to })
+    },
     setTrackerId: (id) => set({ trackerId: id }),
     setShowAllTrips: (show) => set({ showAllTrips: show }),
 
@@ -139,7 +152,11 @@ export const useGeoRideStore = create<State & Actions>((set, get) => {
       try {
         const prevMap = new Map(trips.map(t => [normalizeKey(t), !!t.selected]))
         const url = buildTripsUrl(baseUrl, viewMode, dateFrom, dateTo, trackerId ?? get().trackerId, showAllTrips)
-        const res = await fetch(url)
+        
+        // Utiliser le client API avec retry
+        const endpoint = url.replace(baseUrl, '')
+        const res = await apiClient.get(endpoint)
+        
         if (!res.ok) throw new Error(`HTTP ${res.status} on ${url}`)
         const incoming: Trip[] = await res.json()
 
@@ -159,8 +176,10 @@ export const useGeoRideStore = create<State & Actions>((set, get) => {
 
     refreshTrips: () => {
       const { viewMode, trackerId } = get()
+      // En mode georide, on a besoin d'un trackerId
       if (viewMode === 'georide' && !trackerId) return
-      get().fetchTrips(API_BASE_URL, trackerId)
+      // En mode local, on rafraîchit sans trackerId
+      get().fetchTrips(API_BASE_URL, viewMode === 'georide' ? trackerId : undefined)
     },
   }
 })

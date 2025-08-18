@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { API_BASE_URL } from '../config'
 import { useGeoRideStore } from '../store/georideStore'
 
@@ -18,6 +18,7 @@ export default function ImportSingleTripButton({
   const [isImporting, setIsImporting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const refreshTrips = useGeoRideStore(s => s.refreshTrips)
+  const setViewMode = useGeoRideStore(s => s.setViewMode)
 
   const handleImport = async () => {
     if (!tripId || !trackerId || !startTime || !endTime) {
@@ -43,14 +44,15 @@ export default function ImportSingleTripButton({
       })
 
       if (response.ok) {
-        const result = await response.json()
+        await response.json() // Consommer la réponse
         setMessage(`✅ Trajet ${tripId} importé avec succès`)
         
-        // Rafraîchir la liste des trajets après un import réussi
+        // Basculer en mode local et rafraîchir pour voir le trajet importé
         setTimeout(() => {
+          setViewMode('local')
           refreshTrips()
           setMessage(null)
-        }, 2000)
+        }, 1500)
       } else {
         const error = await response.json()
         setMessage(`❌ ${error.error || 'Import échoué'}`)
