@@ -46,8 +46,13 @@ export default function TripListItem({
       
       {/* Contenu principal */}
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium">
+        <div className="text-sm font-medium flex items-center gap-1.5">
           <TripTimeRange start={trip.startTime} end={trip.endTime} />
+          {trip.imported && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700 border border-green-300 shrink-0">
+              DB
+            </span>
+          )}
         </div>
         <div className="text-xs text-gray-600">
           {km.toFixed(1)} km · {hours > 0 ? `${hours}h ${minutes}min` : `${minutes}min`} · {avgKmh} km/h

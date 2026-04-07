@@ -75,7 +75,7 @@ export async function getPositionsByTripId(tripId: number): Promise<any[]> {
 
 export async function tripHasPositions(tripId: number): Promise<boolean> {
   const res = await pool.query(
-    'SELECT COUNT(*) as count FROM trip_positions WHERE id = $1',
+    'SELECT COUNT(*) as count FROM trip_positions WHERE idTrip = $1',
     [tripId]
   );
   return parseInt(res.rows[0].count) > 0;

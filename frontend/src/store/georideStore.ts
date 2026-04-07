@@ -4,6 +4,8 @@ import { apiClient } from '../utils/apiClient'
 import { API_BASE_URL } from '../config'
 
 export type ViewMode = 'georide' | 'local'
+export type SortBy = 'date' | 'distance' | 'duration'
+export type SortDir = 'asc' | 'desc'
 
 export type Trip = {
   id?: number | null
@@ -13,7 +15,15 @@ export type Trip = {
   distance?: number | null
   duration?: number | null
   averageSpeed?: number | null
+  maxSpeed?: number | null
+  maxAngle?: number | null
+  maxLeftAngle?: number | null
+  maxRightAngle?: number | null
+  averageAngle?: number | null
+  startAddress?: string | null
+  endAddress?: string | null
   selected?: boolean
+  imported?: boolean
 }
 
 type GeojsonCache = Record<string, any>
@@ -24,6 +34,8 @@ type State = {
   dateTo?: string
   trackerId?: number
   showAllTrips: boolean
+  sortBy: SortBy
+  sortDir: SortDir
   trips: Trip[]
   geojsonCache: GeojsonCache
   loading: boolean
@@ -41,6 +53,7 @@ type Actions = {
   clearTrips: () => void
   setGeojsonFor: (key: string, data: any) => void
 
+  setSortBy: (sort: SortBy) => void
   toggleTrip: (trip: Trip) => void
   fetchTrips: (baseUrl: string, trackerId?: number) => Promise<void>
   refreshTrips: () => void
@@ -86,6 +99,21 @@ export const colorOf = (t: Trip) => {
 }
 export const hasBounds = (t: Trip) => !!(t.startTime && t.endTime)
 
+const sortTrips = (trips: Trip[], sortBy: SortBy, sortDir: SortDir): Trip[] => {
+  const dir = sortDir === 'asc' ? 1 : -1
+  return [...trips].sort((a, b) => {
+    switch (sortBy) {
+      case 'distance':
+        return (Number(a.distance ?? 0) - Number(b.distance ?? 0)) * dir
+      case 'duration':
+        return (Number(a.duration ?? 0) - Number(b.duration ?? 0)) * dir
+      case 'date':
+      default:
+        return ((a.startTime ?? '').localeCompare(b.startTime ?? '')) * dir
+    }
+  })
+}
+
 const strip = (u: string) => u.replace(/\/+$/, '')
 
 const buildTripsUrl = (
@@ -100,8 +128,8 @@ const buildTripsUrl = (
   if (mode === 'georide') {
     const p = new URLSearchParams()
     if (trackerId != null) p.set('trackerId', String(trackerId))
-    if (from && !showAllTrips) p.set('from', from)
-    if (to && !showAllTrips) p.set('to', to)
+    if (from) p.set('from', from)
+    if (to) p.set('to', to)
     return `${base}/georide/trips?${p.toString()}`
   }
   const p = new URLSearchParams()
@@ -120,6 +148,8 @@ export const useGeoRideStore = create<State & Actions>((set, get) => {
     dateFrom: defaultDates.from,
     dateTo: defaultDates.to,
     showAllTrips: false,
+    sortBy: 'date' as SortBy,
+    sortDir: 'desc' as SortDir,
     trips: [],
     geojsonCache: {},
     loading: false,
@@ -139,6 +169,15 @@ export const useGeoRideStore = create<State & Actions>((set, get) => {
     setGeojsonFor: (key, data) => set(s => ({
       geojsonCache: { ...s.geojsonCache, [key]: data }
     })),
+
+    setSortBy: (sort) => set(s => {
+      const newDir = s.sortBy === sort && s.sortDir === 'desc' ? 'asc' : 'desc'
+      return {
+        sortBy: sort,
+        sortDir: newDir,
+        trips: sortTrips(s.trips, sort, newDir),
+      }
+    }),
 
     toggleTrip: (trip) => set(s => ({
       trips: s.trips.map(t =>
@@ -166,7 +205,8 @@ export const useGeoRideStore = create<State & Actions>((set, get) => {
           selected: prevMap.get(normalizeKey(t)) ?? false
         }))
 
-        set({ trips: merged })
+        const { sortBy, sortDir } = get()
+        set({ trips: sortTrips(merged, sortBy, sortDir) })
       } catch (e: any) {
         set({ error: String(e?.message ?? e) })
       } finally {

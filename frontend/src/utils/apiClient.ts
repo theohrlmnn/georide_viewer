@@ -26,6 +26,12 @@ export class ApiClient {
         return this.fetchWithRetry(endpoint, options, retryCount + 1)
       }
       
+      // Si 401, l'utilisateur doit se reconnecter
+      if (response.status === 401) {
+        window.location.reload()
+        return response
+      }
+
       // Sinon, retourner la réponse d'erreur
       return response
       

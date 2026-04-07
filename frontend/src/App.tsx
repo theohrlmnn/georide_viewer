@@ -6,6 +6,8 @@ import TripListPanel from './components/TripListPanel'
 import DateOnlyRangePicker from './components/DateOnlyRangePicker'
 import DateRangeStatus from './components/DateRangeStatus'
 import TripQuickSearch from './components/TripQuickSearch'
+import LoginForm from './components/LoginForm'
+import StatsPanel from './components/StatsPanel'
 
 import { useGeoRideStore } from './store/georideStore'
 import { API_BASE_URL } from './config'
@@ -14,21 +16,19 @@ import { apiClient } from './utils/apiClient'
 const trackerId = 2055973
 const toIso = (dateStr?: string) => {
   if (!dateStr) return undefined
-  // Convertir YYYY-MM-DD vers ISO avec heure de début de journée en UTC
   return dateStr + 'T00:00:00.000Z'
 }
 
 const toDateValue = (iso?: string) => {
   if (!iso) return ''
-  // Convertir ISO vers YYYY-MM-DD en évitant les problèmes de fuseau horaire
-  // Si l'ISO contient déjà une date complète, on prend juste la partie date
   if (iso.includes('T')) {
     return iso.slice(0, 10)
   }
-  // Sinon, conversion sécurisée
-  const date = new Date(iso + 'T12:00:00.000Z') // Midi UTC pour éviter les décalages
+  const date = new Date(iso + 'T12:00:00.000Z')
   return date.toISOString().slice(0, 10)
 }
+
+type AppState = 'loading' | 'login' | 'ready'
 
 export default function App() {
   const viewMode     = useGeoRideStore(s => s.viewMode)
@@ -38,33 +38,51 @@ export default function App() {
   const resetGeojson = useGeoRideStore(s => s.resetGeojson)
   const setDateRange = useGeoRideStore(s => s.setDateRange)
   const setTrackerId = useGeoRideStore(s => s.setTrackerId)
-  
-  const [isBackendReady, setIsBackendReady] = useState(false)
+  const showAllTrips = useGeoRideStore(s => s.showAllTrips)
+  const hasSelected  = useGeoRideStore(s => s.trips.some(t => t.selected))
+
+  const [appState, setAppState] = useState<AppState>('loading')
 
   useEffect(() => { setTrackerId(trackerId) }, [])
 
+  // Verifier backend + auth au demarrage
   useEffect(() => {
-    // Attendre que le backend soit disponible avant de charger les données
-    const initializeApp = async () => {
-      console.log('🔄 Vérification de la disponibilité du backend...')
-      const isBackendReady = await apiClient.waitForBackend()
-      
-      if (isBackendReady) {
-        console.log('✅ Backend prêt, chargement des données...')
-        setIsBackendReady(true)
-        resetGeojson()              // purge le cache des tracés
-        fetchTrips(API_BASE_URL)    // recharge la liste selon mode + dates + trackerId (en store)
-      } else {
-        console.error('❌ Backend non disponible après plusieurs tentatives')
-        setIsBackendReady(false)
+    const init = async () => {
+      const backendReady = await apiClient.waitForBackend()
+      if (!backendReady) {
+        setAppState('loading')
+        return
       }
-    }
-    
-    initializeApp()
-  }, [viewMode, dateFrom, dateTo])
 
-  // Affichage de chargement si le backend n'est pas prêt
-  if (!isBackendReady) {
+      // Verifier si on est authentifie
+      try {
+        const res = await apiClient.get('/auth/status')
+        if (res.ok) {
+          const status = await res.json()
+          if (!status.authenticated) {
+            setAppState('login')
+            return
+          }
+        }
+      } catch {
+        // Si le status echoue, on continue (le token .env est peut-etre utilise)
+      }
+
+      setAppState('ready')
+      resetGeojson()
+      fetchTrips(API_BASE_URL)
+    }
+
+    init()
+  }, [viewMode, dateFrom, dateTo, showAllTrips])
+
+  const handleLoginSuccess = () => {
+    setAppState('ready')
+    resetGeojson()
+    fetchTrips(API_BASE_URL)
+  }
+
+  if (appState === 'loading') {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-gray-900">
         <div className="text-center text-white">
@@ -76,39 +94,36 @@ export default function App() {
     )
   }
 
+  if (appState === 'login') {
+    return <LoginForm onLoginSuccess={handleLoginSuccess} />
+  }
+
   return (
     <div className="h-screen w-screen relative">
       <div className="absolute inset-0">
         <MapView baseUrl={API_BASE_URL} trackerId={trackerId} />
       </div>
 
-      <div className="absolute bottom-4 left-4 z-[1000] flex flex-col gap-4">
-        {/* Switch toujours en haut */}
-        <div className="bg-gray-900/70 text-white rounded-xl shadow-lg p-3 backdrop-blur-md">
+      <div className="absolute top-4 bottom-4 left-4 z-[1000] flex flex-col gap-4">
+        <div className="bg-gray-900/70 text-white rounded-xl shadow-lg p-3 backdrop-blur-md shrink-0">
           <MenuSwitch />
         </div>
 
-        {/* Recherche rapide et sélecteur de dates */}
-        <div className="bg-gray-900/70 text-white rounded-xl shadow-lg p-4 backdrop-blur-md">
-          {/* Recherche rapide */}
+        <div className="bg-gray-900/70 text-white rounded-xl shadow-lg p-4 backdrop-blur-md shrink-0">
           <TripQuickSearch
             onDateRangeSelect={(start, end) => setDateRange(toIso(start), toIso(end))}
           />
-          
-          {/* Séparateur */}
+
           <div className="my-4 border-t border-gray-600/50"></div>
-          
-          {/* Sélecteur de dates précises */}
+
           <DateOnlyRangePicker
             startValue={toDateValue(dateFrom)}
             endValue={toDateValue(dateTo)}
             onStartChange={(value) => {
-              // Pour date début, on prend 00:00:00 en UTC direct
               const startIso = value ? value + 'T00:00:00.000Z' : undefined
               setDateRange(startIso, dateTo)
             }}
             onEndChange={(value) => {
-              // Pour date fin, on prend 23:59:59 en UTC direct pour inclure toute la journée
               const endIso = value ? value + 'T23:59:59.000Z' : undefined
               setDateRange(dateFrom, endIso)
             }}
@@ -121,11 +136,19 @@ export default function App() {
           </div>
         </div>
 
-        {/* Liste */}
-        <div className="bg-gray-900/70 text-white rounded-xl shadow-lg p-3 backdrop-blur-md">
+        <div className="bg-gray-900/70 text-white rounded-xl shadow-lg p-3 backdrop-blur-md min-h-0 flex-1 overflow-y-auto">
           <TripListPanel />
         </div>
       </div>
+
+      {/* Statistiques des trajets sélectionnés */}
+      {hasSelected && (
+        <div className="absolute bottom-4 right-4 z-[1000]">
+          <div className="bg-gray-900/70 text-white rounded-xl shadow-lg p-4 backdrop-blur-md">
+            <StatsPanel />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

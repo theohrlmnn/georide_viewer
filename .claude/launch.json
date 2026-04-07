@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Frontend (Vite)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "frontend"],
+      "port": 5173
+    },
+    {
+      "name": "Backend (Express)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "backend"],
+      "port": 4000
+    },
+    {
+      "name": "Database (PostGIS)",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "gv_db"],
+      "port": 5432
+    }
+  ]
+}

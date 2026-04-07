@@ -49,9 +49,9 @@ export async function initDb() {
     `;
 
   const createIndexes = `
-    CREATE INDEX IF NOT EXISTS idx_trip_positions_id ON trip_positions(id);
+    CREATE INDEX IF NOT EXISTS idx_trip_positions_idtrip ON trip_positions(idTrip);
     CREATE INDEX IF NOT EXISTS idx_trip_positions_fixtime ON trip_positions(fixtime);
-    CREATE INDEX IF NOT EXISTS idx_trip_positions_trip_time ON trip_positions(id, fixtime);
+    CREATE INDEX IF NOT EXISTS idx_trip_positions_trip_time ON trip_positions(idTrip, fixtime);
   `;
 
   // Index GIST pour les géométries PostGIS

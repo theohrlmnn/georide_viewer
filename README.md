@@ -40,11 +40,10 @@ L'objectif est double :
 - 🎯 **Sélection manuelle** des trajets à afficher
 - ⚡ **Cache GeoJSON** pour éviter les recharges inutiles
 - 📦 Architecture claire et extensible
-
-### 🛠 À implémenter
 - 📐 **Statistiques** (distance, durée, vitesse moyenne)
+### 🛠 À implémenter
+
 - 🔽 Sélecteur de `trackerId` dynamique
-- 🔄 Table `auth_tokens` + cron de rafraîchissement token
 - 🗄 Ajout de `geom` (PostGIS) et index GIST
 - 📉 Simplification polylignes côté backend (Douglas‑Peucker)
 - ⬇️ Import direct depuis la liste GeoRide
@@ -150,5 +149,3 @@ npm run dev
 4. Importer des données de test
 
 ---
-
-

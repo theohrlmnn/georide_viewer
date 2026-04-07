@@ -9,6 +9,15 @@ export async function tripExists(tripId: number): Promise<boolean> {
   return (res.rowCount ?? 0) > 0;
 }
 
+export async function findExistingTripIds(ids: number[]): Promise<Set<number>> {
+  if (ids.length === 0) return new Set()
+  const res = await pool.query(
+    'SELECT id FROM trips WHERE id = ANY($1)',
+    [ids]
+  )
+  return new Set(res.rows.map((r: any) => r.id))
+}
+
 export async function insertTrip(trip: Trip): Promise<void> {
   await pool.query(
     `INSERT INTO trips (

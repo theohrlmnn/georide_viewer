@@ -1,10 +1,11 @@
 // src/components/MapView.tsx
-import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useState } from 'react'
 import { useGeoRideStore, cacheKey, colorOf } from '../store/georideStore'
 import { resolveBounds } from './TripTimeRange'
 import MapStyleSelector, { MAP_STYLES, type MapStyle } from './MapStyleSelector'
+import DirectionLayer, { extractCoords } from './DirectionLayer'
 import type { LatLngBoundsExpression } from 'leaflet'
 
 type Props = { baseUrl: string; trackerId: number }
@@ -194,7 +195,10 @@ export default function MapView({ baseUrl, trackerId }: Props) {
         {selected.map(t => {
           const k = cacheKey(viewMode, t)
           const gj = geojsonCache[k]
-          return gj ? <GeoJSON key={k} data={gj} style={{ color: colorOf(t), weight: 4, opacity: 0.8 }} /> : null
+          if (!gj) return null
+          const coords = extractCoords(gj)
+          if (coords.length < 2) return null
+          return <DirectionLayer key={k} coordinates={coords} color={colorOf(t)} />
         })}
       </MapContainer>
       

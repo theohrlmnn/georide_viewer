@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose:*)",
+      "Bash(where docker:*)",
+      "Bash(docker info:*)",
+      "WebFetch(domain:api.georide.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebSearch",
+      "WebFetch(domain:neilujd.github.io)",
+      "WebFetch(domain:tomescolano.fr)",
+      "Bash(xargs grep:*)"
+    ]
+  }
+}

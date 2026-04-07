@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import { initDb } from './db/initDb';
 import pool from './db/index';
 import { importTrips } from './services/tripImporter';
-import { getAllTrips, getTripById, deleteTripById } from './repositories/tripRepository';
+import { getAllTrips, getTripById, deleteTripById, findExistingTripIds } from './repositories/tripRepository';
 import { getPositionsByTripId } from './repositories/tripPositionsRepository';
 
 import { GeorideProvider } from './providers/georideProvider'
@@ -13,6 +13,7 @@ import { LocalProvider } from './providers/localProvider'
 import { listTrips, getTripGeoJSON } from './services/tripService'
 import { SpatialQueries } from './utils/geometryUtils'
 import { getCacheStats, clearGeoRideCache } from './services/georideCache'
+import { startTokenCron, getToken, login, logout, getAuthStatus } from './services/tokenService'
 import helmet from 'helmet'
 dotenv.config();
 
@@ -53,9 +54,16 @@ app.get('/georide/trips', async (req: Request, res: Response) => {
     const to   = typeof req.query.to   === 'string' ? req.query.to   : undefined
     if (!trackerId) return res.status(400).json({ error: 'trackerId requis' })
     const trips = await listTrips(new GeorideProvider(), { trackerId, from, to })
-    res.json(trips)
+    const ids = trips.map((t: any) => t.id).filter((id: any) => id != null)
+    const existingIds = await findExistingTripIds(ids)
+    const enriched = trips.map((t: any) => ({ ...t, imported: existingIds.has(t.id) }))
+    res.json(enriched)
   } catch (e:any) {
-    res.status(400).json({ error: e.message })
+    const msg = e.message || ''
+    if (msg.includes('Non authentifie') || msg.includes('Token expire') || msg.includes('401')) {
+      return res.status(401).json({ error: msg })
+    }
+    res.status(400).json({ error: msg })
   }
 })
 
@@ -89,9 +97,13 @@ app.get('/georide/trips/:id/geojson', async (req: Request, res: Response) => {
     })
     return res.json(feature)
   } catch (e: any) {
+    const msg = e?.message || ''
     console.error('GET /georide/trips/:id/geojson failed', {
-      id, trackerId, from, to, message: e?.message,
+      id, trackerId, from, to, message: msg,
     })
+    if (msg.includes('Non authentifie') || msg.includes('Token expire') || msg.includes('401')) {
+      return res.status(401).json({ error: msg })
+    }
     return res.status(502).json({ error: 'georide upstream error' })
   }
 })
@@ -253,10 +265,48 @@ app.get('/trips/distance/:id1/:id2', async (req: Request, res: Response) => {
 });
 
 
+// ========== AUTHENTIFICATION GEORIDE ==========
+
+// POST /auth/login - Connexion GeoRide depuis l'UI
+app.post('/auth/login', async (req, res) => {
+  const { email, password } = req.body
+  if (!email || !password) {
+    res.status(400).json({ error: 'Email et mot de passe requis' })
+    return
+  }
+
+  try {
+    await login(email, password)
+    res.json({ success: true, message: 'Connexion reussie' })
+  } catch (err: any) {
+    res.status(401).json({ error: err.message })
+  }
+})
+
+// GET /auth/status - Statut de l'authentification
+app.get('/auth/status', async (req, res) => {
+  try {
+    const status = await getAuthStatus()
+    res.json(status)
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur serveur' })
+  }
+})
+
+// POST /auth/logout - Deconnexion
+app.post('/auth/logout', async (req, res) => {
+  try {
+    await logout()
+    res.json({ success: true, message: 'Deconnexion reussie' })
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur serveur' })
+  }
+});
+
 (async () => {
   await initDb();
+  startTokenCron();
 
-  const port = process.env.PORT || 4000;
   app.listen(port, () => {
     console.log(`🚀 API REST disponible sur http://localhost:${port}`);
   });
