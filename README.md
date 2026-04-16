@@ -41,11 +41,11 @@ L'objectif est double :
 - ⚡ **Cache GeoJSON** pour éviter les recharges inutiles
 - 📦 Architecture claire et extensible
 - 📐 **Statistiques** (distance, durée, vitesse moyenne)
+- 📉 **Simplification polylignes** côté backend (Douglas‑Peucker, tolérance ajustable via `?tolerance=`)
 ### 🛠 À implémenter
 
 - 🔽 Sélecteur de `trackerId` dynamique
 - 🗄 Ajout de `geom` (PostGIS) et index GIST
-- 📉 Simplification polylignes côté backend (Douglas‑Peucker)
 - ⬇️ Import direct depuis la liste GeoRide
 - 📊 Panneau de statistiques globales
 - 📱 Support complet PWA

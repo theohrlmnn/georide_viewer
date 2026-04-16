@@ -14,6 +14,15 @@ import { listTrips, getTripGeoJSON } from './services/tripService'
 import { SpatialQueries } from './utils/geometryUtils'
 import { getCacheStats, clearGeoRideCache } from './services/georideCache'
 import { startTokenCron, getToken, login, logout, getAuthStatus } from './services/tokenService'
+import {
+  getAllGroups,
+  createGroup,
+  renameGroup,
+  deleteGroup,
+  addTripToGroup,
+  removeTripFromGroup,
+} from './repositories/groupRepository'
+import { importGpxData } from './services/gpxImporter'
 import helmet from 'helmet'
 dotenv.config();
 
@@ -24,7 +33,21 @@ const port = process.env.PORT || 4000;
 
 app.use(helmet())
 app.use(cors({ origin: 'http://localhost:5173' }))
-app.use(express.json())
+app.use(express.json({ limit: '10mb' }))
+
+/**
+ * Parse la query ?tolerance= d'une route GeoJSON.
+ * - absente / invalide -> undefined (valeur par defaut du service)
+ * - 0 ou <= 0          -> 0 (pas de simplification, polyligne brute)
+ * - nombre valide      -> valeur clampee a [0, 0.01] (0.01 deg ~ 1.1 km, garde-fou)
+ */
+function parseTolerance(raw: unknown): number | undefined {
+  if (raw === undefined || raw === null || raw === '') return undefined
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return undefined
+  if (n <= 0) return 0
+  return Math.min(n, 0.01)
+}
 
 // Health check endpoint pour Docker
 app.get('/health', async (req, res) => {
@@ -74,6 +97,7 @@ app.get('/georide/trips/:id/geojson', async (req: Request, res: Response) => {
   const trackerId = Number(req.query.trackerId)
   const from = req.query.from as string | undefined
   const to = req.query.to as string | undefined
+  const tolerance = parseTolerance(req.query.tolerance)
 
   if (!Number.isFinite(id) || !Number.isFinite(trackerId)) {
     //add id and trackerId in the error message
@@ -94,6 +118,7 @@ app.get('/georide/trips/:id/geojson', async (req: Request, res: Response) => {
       id: id,
       from: fromDate.toISOString(),
       to: toDate.toISOString(),
+      tolerance,
     })
     return res.json(feature)
   } catch (e: any) {
@@ -151,8 +176,9 @@ app.get('/trips/:id', async (req: Request, res: Response) => {
 app.get('/trips/:id/geojson', async (req: Request, res: Response) => {
   const id = Number(req.params.id)
   if (Number.isNaN(id)) return res.status(400).json({ error: 'ID invalide' })
+  const tolerance = parseTolerance(req.query.tolerance)
   try {
-    const feature = await getTripGeoJSON(new LocalProvider(), { id })
+    const feature = await getTripGeoJSON(new LocalProvider(), { id, tolerance })
     if (!feature.geometry.coordinates.length) {
       return res.status(404).json({ error: 'Aucune position trouvée pour ce trajet' })
     }
@@ -195,6 +221,112 @@ app.delete('/trips/:id', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
+
+// ========== IMPORT GPX ==========
+
+// POST /trips/import/gpx-data
+// Body : { name: string, points: Array<{ lat, lon, time }> }
+// Le parsing XML est fait côté client (DOMParser) ; le backend ne reçoit que du JSON.
+app.post('/trips/import/gpx-data', async (req: Request, res: Response) => {
+  const { name, points } = req.body
+  if (!Array.isArray(points) || points.length < 2) {
+    return res.status(400).json({ error: 'points requis (tableau ≥ 2 éléments)' })
+  }
+  try {
+    const result = await importGpxData({ name: String(name || 'Import GPX'), points })
+    res.status(201).json(result)
+  } catch (err: any) {
+    console.error('❌ Erreur import GPX:', err)
+    res.status(400).json({ error: err.message })
+  }
+})
+
+// ========== GROUPES DE TRAJETS ==========
+
+// GET /groups — liste tous les groupes avec stats
+app.get('/groups', async (_req, res) => {
+  try {
+    const groups = await getAllGroups()
+    res.json(groups)
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /groups — créer un groupe { name, tripIds? }
+app.post('/groups', async (req: Request, res: Response) => {
+  const { name, tripIds = [] } = req.body
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name requis' })
+  }
+  if (!Array.isArray(tripIds) || tripIds.some(id => !Number.isInteger(id))) {
+    return res.status(400).json({ error: 'tripIds doit être un tableau d\'entiers' })
+  }
+  try {
+    const group = await createGroup(name, tripIds)
+    res.status(201).json(group)
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// PATCH /groups/:id — renommer un groupe { name }
+app.patch('/groups/:id', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id)
+  if (isNaN(id)) return res.status(400).json({ error: 'ID invalide' })
+  const { name } = req.body
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name requis' })
+  }
+  try {
+    await renameGroup(id, name)
+    res.json({ success: true })
+  } catch (err: any) {
+    res.status(404).json({ error: err.message })
+  }
+})
+
+// DELETE /groups/:id — supprimer un groupe
+app.delete('/groups/:id', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id)
+  if (isNaN(id)) return res.status(400).json({ error: 'ID invalide' })
+  try {
+    await deleteGroup(id)
+    res.status(204).send()
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /groups/:id/trips — ajouter un trajet au groupe { tripId }
+app.post('/groups/:id/trips', async (req: Request, res: Response) => {
+  const groupId = parseInt(req.params.id)
+  const tripId  = parseInt(req.body.tripId)
+  if (isNaN(groupId) || isNaN(tripId)) {
+    return res.status(400).json({ error: 'groupId et tripId requis (entiers)' })
+  }
+  try {
+    await addTripToGroup(groupId, tripId)
+    res.json({ success: true })
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// DELETE /groups/:id/trips/:tripId — retirer un trajet du groupe
+app.delete('/groups/:id/trips/:tripId', async (req: Request, res: Response) => {
+  const groupId = parseInt(req.params.id)
+  const tripId  = parseInt(req.params.tripId)
+  if (isNaN(groupId) || isNaN(tripId)) {
+    return res.status(400).json({ error: 'IDs invalides' })
+  }
+  try {
+    await removeTripFromGroup(groupId, tripId)
+    res.status(204).send()
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
 
 // ========== ENDPOINTS CACHE GEORIDE ==========
 

@@ -26,6 +26,16 @@ export type Trip = {
   imported?: boolean
 }
 
+export type TripGroup = {
+  id: number
+  name: string
+  tripIds: number[]
+  totalDistance: number
+  totalDuration: number
+  tripCount: number
+  createdAt?: string
+}
+
 type GeojsonCache = Record<string, any>
 
 type State = {
@@ -40,6 +50,10 @@ type State = {
   geojsonCache: GeojsonCache
   loading: boolean
   error?: string
+  // Groupes
+  groups: TripGroup[]
+  groupsExpanded: Record<number, boolean>
+  groupsLoading: boolean
 }
 
 type Actions = {
@@ -57,6 +71,16 @@ type Actions = {
   toggleTrip: (trip: Trip) => void
   fetchTrips: (baseUrl: string, trackerId?: number) => Promise<void>
   refreshTrips: () => void
+
+  // Groupes
+  fetchGroups: () => Promise<void>
+  createGroup: (name: string, tripIds: number[]) => Promise<void>
+  renameGroup: (id: number, name: string) => Promise<void>
+  deleteGroup: (id: number) => Promise<void>
+  addTripToGroup: (groupId: number, tripId: number) => Promise<void>
+  removeTripFromGroup: (groupId: number, tripId: number) => Promise<void>
+  toggleGroupExpanded: (groupId: number) => void
+  toggleGroupAllSelected: (groupId: number) => void
 }
 
 // ---------- helpers partagés ----------
@@ -85,18 +109,38 @@ export const normalizeKey = (t: Trip) =>
 
 export const cacheKey = (mode: ViewMode, t: Trip) => `${mode}:${normalizeKey(t)}`
 
-// (même algo des deux côtés pour garantir une couleur stable coordonnée avec la légende)
-export const colorOf = (t: Trip) => {
-  const k = normalizeKey(t)
+// Palette partagée par colorOf et groupColorOf — même algo, clé différente
+const COLOR_PALETTE = [
+  '#e6194b', '#3cb44b', '#ffe119', '#0082c8', '#f58231',
+  '#911eb4', '#46f0f0', '#f032e6', '#d2f53c', '#fabebe',
+  '#008080', '#e6beff', '#aa6e28', '#800000', '#808000',
+]
+const hashStr = (s: string) => {
   let h = 0
-  for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) | 0
-  const palette = [
-    '#e6194b', '#3cb44b', '#ffe119', '#0082c8', '#f58231',
-    '#911eb4', '#46f0f0', '#f032e6', '#d2f53c', '#fabebe',
-    '#008080', '#e6beff', '#aa6e28', '#800000', '#808000'
-  ]
-  return palette[Math.abs(h) % palette.length]
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0
+  return COLOR_PALETTE[Math.abs(h) % COLOR_PALETTE.length]
 }
+
+/** Couleur stable d'un trajet individuel */
+export const colorOf = (t: Trip) => hashStr(normalizeKey(t))
+
+/** Couleur stable d'un groupe (hashée sur son ID) */
+export const groupColorOf = (g: TripGroup) => hashStr(`group:${g.id}`)
+
+/**
+ * Construit une Map<tripId, couleur> en tenant compte des groupes.
+ * Les trajets d'un même groupe partagent la couleur du groupe.
+ * À recalculer quand `groups` change (useMemo).
+ */
+export const buildGroupColorMap = (groups: TripGroup[]): Map<number, string> => {
+  const map = new Map<number, string>()
+  groups.forEach(g => {
+    const color = groupColorOf(g)
+    g.tripIds.forEach(id => map.set(id, color))
+  })
+  return map
+}
+
 export const hasBounds = (t: Trip) => !!(t.startTime && t.endTime)
 
 const sortTrips = (trips: Trip[], sortBy: SortBy, sortDir: SortDir): Trip[] => {
@@ -142,7 +186,7 @@ const buildTripsUrl = (
 // ---------- store ----------
 export const useGeoRideStore = create<State & Actions>((set, get) => {
   const defaultDates = getDefaultDateRange()
-  
+
   return {
     viewMode: 'georide',
     dateFrom: defaultDates.from,
@@ -153,6 +197,9 @@ export const useGeoRideStore = create<State & Actions>((set, get) => {
     trips: [],
     geojsonCache: {},
     loading: false,
+    groups: [],
+    groupsExpanded: {},
+    groupsLoading: false,
 
     setViewMode: (m) => set({ viewMode: m }),
     setDateRange: (from, to) => set({ dateFrom: from, dateTo: to }),
@@ -220,6 +267,96 @@ export const useGeoRideStore = create<State & Actions>((set, get) => {
       if (viewMode === 'georide' && !trackerId) return
       // En mode local, on rafraîchit sans trackerId
       get().fetchTrips(API_BASE_URL, viewMode === 'georide' ? trackerId : undefined)
+    },
+
+    // ---- Actions groupes ----
+
+    fetchGroups: async () => {
+      set({ groupsLoading: true })
+      try {
+        const res = await apiClient.get('/groups')
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const groups: TripGroup[] = await res.json()
+        set({ groups })
+      } catch (e: any) {
+        console.error('fetchGroups error:', e)
+      } finally {
+        set({ groupsLoading: false })
+      }
+    },
+
+    createGroup: async (name, tripIds) => {
+      const res = await apiClient.post('/groups', { name, tripIds })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      await get().fetchGroups()
+    },
+
+    renameGroup: async (id, name) => {
+      const res = await apiClient.fetchWithRetry(`/groups/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      set(s => ({
+        groups: s.groups.map(g => g.id === id ? { ...g, name } : g)
+      }))
+    },
+
+    deleteGroup: async (id) => {
+      const res = await apiClient.fetchWithRetry(`/groups/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      set(s => ({
+        groups: s.groups.filter(g => g.id !== id),
+        groupsExpanded: Object.fromEntries(
+          Object.entries(s.groupsExpanded).filter(([k]) => Number(k) !== id)
+        ),
+      }))
+    },
+
+    addTripToGroup: async (groupId, tripId) => {
+      const res = await apiClient.post(`/groups/${groupId}/trips`, { tripId })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      await get().fetchGroups()
+    },
+
+    removeTripFromGroup: async (groupId, tripId) => {
+      const res = await apiClient.fetchWithRetry(`/groups/${groupId}/trips/${tripId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      set(s => ({
+        groups: s.groups.map(g =>
+          g.id === groupId
+            ? { ...g, tripIds: g.tripIds.filter(id => id !== tripId), tripCount: g.tripCount - 1 }
+            : g
+        )
+      }))
+    },
+
+    toggleGroupExpanded: (groupId) => {
+      set(s => ({
+        groupsExpanded: {
+          ...s.groupsExpanded,
+          [groupId]: !s.groupsExpanded[groupId],
+        }
+      }))
+    },
+
+    toggleGroupAllSelected: (groupId) => {
+      const { groups, trips } = get()
+      const group = groups.find(g => g.id === groupId)
+      if (!group) return
+
+      const groupTripIds = new Set(group.tripIds)
+      const groupTrips = trips.filter(t => t.id != null && groupTripIds.has(t.id as number))
+      const anySelected = groupTrips.some(t => t.selected)
+
+      set(s => ({
+        trips: s.trips.map(t =>
+          t.id != null && groupTripIds.has(t.id as number)
+            ? { ...t, selected: !anySelected }
+            : t
+        )
+      }))
     },
   }
 })

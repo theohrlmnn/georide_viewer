@@ -1,8 +1,8 @@
 // src/components/MapView.tsx
 import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
-import { useEffect, useState } from 'react'
-import { useGeoRideStore, cacheKey, colorOf } from '../store/georideStore'
+import { useEffect, useState, useMemo } from 'react'
+import { useGeoRideStore, cacheKey, colorOf, buildGroupColorMap } from '../store/georideStore'
 import { resolveBounds } from './TripTimeRange'
 import MapStyleSelector, { MAP_STYLES, type MapStyle } from './MapStyleSelector'
 import DirectionLayer, { extractCoords } from './DirectionLayer'
@@ -115,8 +115,14 @@ function FitBoundsToData({ geojsonData }: { geojsonData: any[] }) {
 export default function MapView({ baseUrl, trackerId }: Props) {
   const viewMode      = useGeoRideStore(s => s.viewMode)
   const trips         = useGeoRideStore(s => s.trips)
+  const groups        = useGeoRideStore(s => s.groups)
   const geojsonCache  = useGeoRideStore(s => s.geojsonCache)
   const setGeojsonFor = useGeoRideStore(s => s.setGeojsonFor)
+
+  // Couleur effective : groupe > couleur individuelle
+  const groupColorMap = useMemo(() => buildGroupColorMap(groups), [groups])
+  const tripColor = (t: { id?: number | null; trackerId?: number | null; startTime?: string | null; endTime?: string | null }) =>
+    (t.id != null ? groupColorMap.get(t.id as number) : undefined) ?? colorOf(t as any)
   
   // État pour le style de carte sélectionné
   const [currentMapStyle, setCurrentMapStyle] = useState<MapStyle>(
@@ -198,7 +204,7 @@ export default function MapView({ baseUrl, trackerId }: Props) {
           if (!gj) return null
           const coords = extractCoords(gj)
           if (coords.length < 2) return null
-          return <DirectionLayer key={k} coordinates={coords} color={colorOf(t)} />
+          return <DirectionLayer key={k} coordinates={coords} color={tripColor(t)} />
         })}
       </MapContainer>
       

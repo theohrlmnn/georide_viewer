@@ -8,6 +8,7 @@ import DateRangeStatus from './components/DateRangeStatus'
 import TripQuickSearch from './components/TripQuickSearch'
 import LoginForm from './components/LoginForm'
 import StatsPanel from './components/StatsPanel'
+import GpxDropZone from './components/GpxDropZone'
 
 import { useGeoRideStore } from './store/georideStore'
 import { API_BASE_URL } from './config'
@@ -35,6 +36,7 @@ export default function App() {
   const dateFrom     = useGeoRideStore(s => s.dateFrom)
   const dateTo       = useGeoRideStore(s => s.dateTo)
   const fetchTrips   = useGeoRideStore(s => s.fetchTrips)
+  const fetchGroups  = useGeoRideStore(s => s.fetchGroups)
   const resetGeojson = useGeoRideStore(s => s.resetGeojson)
   const setDateRange = useGeoRideStore(s => s.setDateRange)
   const setTrackerId = useGeoRideStore(s => s.setTrackerId)
@@ -71,6 +73,8 @@ export default function App() {
       setAppState('ready')
       resetGeojson()
       fetchTrips(API_BASE_URL)
+      // Les groupes ne concernent que le mode local (trajets avec ID en BDD)
+      if (viewMode === 'local') fetchGroups()
     }
 
     init()
@@ -80,6 +84,7 @@ export default function App() {
     setAppState('ready')
     resetGeojson()
     fetchTrips(API_BASE_URL)
+    if (viewMode === 'local') fetchGroups()
   }
 
   if (appState === 'loading') {
@@ -101,7 +106,13 @@ export default function App() {
   return (
     <div className="h-screen w-screen relative">
       <div className="absolute inset-0">
-        <MapView baseUrl={API_BASE_URL} trackerId={trackerId} />
+        <GpxDropZone onImported={() => {
+          resetGeojson()
+          fetchTrips(API_BASE_URL)
+          fetchGroups()
+        }}>
+          <MapView baseUrl={API_BASE_URL} trackerId={trackerId} />
+        </GpxDropZone>
       </div>
 
       <div className="absolute top-4 bottom-4 left-4 z-[1000] flex flex-col gap-4">
